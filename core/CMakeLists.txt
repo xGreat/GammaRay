@@ -80,6 +80,10 @@ if(Qt5Core_FOUND)
   )
 endif()
 
+if(HAVE_QT_BLUETOOTH)
+  list(APPEND gammaray_srcs remote/bluetoothserverdevice.cpp)
+endif()
+
 if(NOT WIN32)
   set(gammaray_srcs ${gammaray_srcs} tools/messagehandler/backtrace_unix.cpp)
 elseif(MINGW)
@@ -117,6 +121,9 @@ else()
     LINK_PUBLIC ${QT_QTCORE_LIBRARIES} ${QT_QTGUI_LIBRARIES} # GUI is needed for QItemSelectionModel
     LINK_PRIVATE ${QT_QTNETWORK_LIBRARIES}
   )
+endif()
+if(HAVE_QT_BLUETOOTH)
+  target_link_libraries(gammaray_core LINK_PRIVATE Qt5::Bluetooth)
 endif()
 
 install(TARGETS gammaray_core EXPORT GammaRayTargets ${INSTALL_TARGETS_DEFAULT_ARGS})

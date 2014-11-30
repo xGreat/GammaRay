@@ -21,10 +21,15 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <config-gammaray.h>
+
 #include "serverdevice.h"
 
 #include "tcpserverdevice.h"
 #include "localserverdevice.h"
+#ifdef HAVE_QT_BLUETOOTH
+#include "bluetoothserverdevice.h"
+#endif
 
 #include <QDebug>
 #include <QUrl>
@@ -56,6 +61,10 @@ ServerDevice* ServerDevice::create(const QUrl& serverAddress, QObject* parent)
         device = new TcpServerDevice(parent);
     else if (serverAddress.scheme() == QLatin1String("local"))
         device = new LocalServerDevice(parent);
+#ifdef HAVE_QT_BLUETOOTH
+    else if (serverAddress.scheme() == QLatin1String("bluetooth"))
+        device = new BluetoothServerDevice(parent);
+#endif
 
     if (!device) {
         qWarning() << "Unsupported transport protocol:" << serverAddress.toString();

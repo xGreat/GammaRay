@@ -28,6 +28,6 @@ if(Qt5Qml_FOUND)
   add_subdirectory(qmlsupport)
 endif()
 
-if(Qt5Bluetooth_FOUND)
+if(HAVE_QT_BLUETOOTH)
   add_subdirectory(bluetooth)
 endif()

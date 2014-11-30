@@ -230,6 +230,7 @@ if(Qt5Core_FOUND)
 
   include("cmake/ECMQt4To5Porting.cmake")
 
+  set(HAVE_QT_BLUETOOTH ${Qt5Bluetooth_FOUND})
   set(HAVE_QT_CONCURRENT ${Qt5Concurrent_FOUND})
   set(HAVE_QT_WIDGETS ${Qt5Widgets_FOUND})
   set(HAVE_QT_SVG ${Qt5Svg_FOUND})
@@ -268,6 +269,7 @@ else()
   find_package(Qt4 ${QT_MIN_VERSION} QUIET COMPONENTS QtScript QtScriptTools QtWebKit QtDesigner QtSvg QtTest)
 
   include(${QT_USE_FILE})
+  set(HAVE_QT_BLUETOOTH false)
   set(HAVE_QT_CONCURRENT true)
   set(HAVE_QT_WIDGETS true)
   set(HAVE_QT_SVG true)

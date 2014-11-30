@@ -23,6 +23,7 @@
 #cmakedefine HAVE_QT_DESIGNER
 #cmakedefine HAVE_QT_PRINTSUPPORT
 #cmakedefine HAVE_QT_WEBKIT1
+#cmakedefine HAVE_QT_BLUETOOTH
 
 #cmakedefine HAVE_VTK
 #cmakedefine HAVE_GRAPHVIZ
