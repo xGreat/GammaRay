@@ -65,8 +65,14 @@ public:
         VisualizeChanges
     };
 
+    enum PreviewMode {
+        FullWindow,
+        Item
+    };
+
     Q_ENUMS(RenderMode)
     Q_DECLARE_FLAGS(Features, Feature)
+    Q_ENUMS(PreviewMode)
 
     explicit QuickInspectorInterface(QObject *parent = 0);
     ~QuickInspectorInterface();
@@ -79,6 +85,8 @@ public slots:
 
     virtual void checkFeatures() = 0;
 
+    virtual void setPreviewMode(PreviewMode mode) = 0;
+
 signals:
     void features(GammaRay::QuickInspectorInterface::Features features);
 };
@@ -86,6 +94,7 @@ signals:
 
 Q_DECLARE_METATYPE(GammaRay::QuickInspectorInterface::Features)
 Q_DECLARE_METATYPE(GammaRay::QuickInspectorInterface::RenderMode)
+Q_DECLARE_METATYPE(GammaRay::QuickInspectorInterface::PreviewMode)
 QT_BEGIN_NAMESPACE
 Q_DECLARE_INTERFACE(GammaRay::QuickInspectorInterface,
                     "com.kdab.GammaRay.QuickInspectorInterface/1.0")

@@ -60,3 +60,8 @@ void QuickInspectorClient::checkFeatures()
 {
     Endpoint::instance()->invokeObject(objectName(), "checkFeatures");
 }
+
+void QuickInspectorClient::setPreviewMode(QuickInspectorInterface::PreviewMode mode)
+{
+    Endpoint::instance()->invokeObject(objectName(), "setPreviewMode", { QVariant::fromValue(mode) });
+}

@@ -62,6 +62,20 @@ QDataStream &operator>>(QDataStream &in, QuickInspectorInterface::RenderMode &va
     return in;
 }
 
+QDataStream &operator<<(QDataStream &out, QuickInspectorInterface::PreviewMode value)
+{
+    out << qint32(value);
+    return out;
+}
+
+QDataStream &operator>>(QDataStream &in, QuickInspectorInterface::PreviewMode &value)
+{
+    qint32 t;
+    in >> t;
+    value = static_cast<QuickInspectorInterface::PreviewMode>(t);
+    return in;
+}
+
 QuickInspectorInterface::QuickInspectorInterface(QObject *parent)
     : QObject(parent)
 {
@@ -69,6 +83,7 @@ QuickInspectorInterface::QuickInspectorInterface(QObject *parent)
     qRegisterMetaTypeStreamOperators<Features>();
     qRegisterMetaTypeStreamOperators<RenderMode>();
     qRegisterMetaTypeStreamOperators<QuickItemGeometry>();
+    qRegisterMetaTypeStreamOperators<PreviewMode>();
 }
 
 QuickInspectorInterface::~QuickInspectorInterface()

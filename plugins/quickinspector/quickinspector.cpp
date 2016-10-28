@@ -54,6 +54,7 @@
 #include <QQuickItem>
 #include <QQuickWindow>
 #include <QQuickView>
+#include <QQuickItemGrabResult>
 
 #include <QQmlContext>
 #include <QQmlEngine>
@@ -244,6 +245,7 @@ QuickInspector::QuickInspector(ProbeInterface *probe, QObject *parent)
                                                         "com.kdab.GammaRay.QuickSceneGraph"), this))
     , m_remoteView(new RemoteViewServer(QStringLiteral("com.kdab.GammaRay.QuickRemoteView"), this))
     , m_isGrabbingWindow(false)
+    , m_previewMode(QuickInspectorInterface::FullWindow)
 {
     registerPCExtensions();
     registerMetaTypes();
@@ -328,7 +330,6 @@ void QuickInspector::selectWindow(QQuickWindow *window)
 
         // frame swapped isn't enough, we don't get that for FBO render targets such as in QQuickWidget
         connect(window, &QQuickWindow::afterRendering, this, &QuickInspector::slotSceneChanged);
-        connect(window, &QQuickWindow::frameSwapped, this, &QuickInspector::slotSceneChanged);
 
         m_window->update();
     }
@@ -488,6 +489,29 @@ void QuickInspector::slotGrabWindow()
 
     Q_ASSERT(QThread::currentThread() == QCoreApplication::instance()->thread());
     m_isGrabbingWindow = true;
+
+    if (m_currentItem && m_previewMode == QuickInspectorInterface::Item) {
+        QSharedPointer<QQuickItemGrabResult> reply = m_currentItem->grabToImage();
+
+        // The lambda needs to be 'mutable' in order to call reply.clear(), otherwise the
+        // QQuickItemGrabResult will never be deleted.
+        connect(reply.data(), &QQuickItemGrabResult::ready, this, [this, reply]() mutable {
+            m_isGrabbingWindow = false;
+            auto img = reply->image();
+
+            // We don't set the pixel ratio here, as the image is not scaled up
+
+            RemoteViewFrame frame;
+            frame.setImage(img);
+            frame.setSceneRect(img.rect());
+            frame.setData(QVariant::fromValue(img.rect()));
+            m_remoteView->sendFrame(frame);
+            reply.clear();
+        }, Qt::QueuedConnection);
+
+        return;
+    }
+
     foreach (const auto callback, m_grabWindowCallbacks) {
         if (callback(m_window))
             return;
@@ -584,6 +608,16 @@ void QuickInspector::checkFeatures()
 #endif
             )
         );
+}
+
+void QuickInspector::setPreviewMode(QuickInspectorInterface::PreviewMode mode)
+{
+    if (m_previewMode == mode) {
+        return;
+    }
+
+    m_previewMode = mode;
+    slotSceneChanged();
 }
 
 void QuickInspector::itemSelectionChanged(const QItemSelection &selection)

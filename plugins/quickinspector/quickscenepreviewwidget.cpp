@@ -46,12 +46,14 @@ static qint32 QuickScenePreviewWidgetStateVersion = 1;
 
 QT_BEGIN_NAMESPACE
 GAMMARAY_ENUM_STREAM_OPERATORS(GammaRay::QuickInspectorInterface::RenderMode)
+GAMMARAY_ENUM_STREAM_OPERATORS(GammaRay::QuickInspectorInterface::PreviewMode)
 QT_END_NAMESPACE
 
 QuickScenePreviewWidget::QuickScenePreviewWidget(QuickInspectorInterface *inspector,
                                                  QWidget *parent)
     : RemoteViewWidget(parent)
     , m_inspectorInterface(inspector)
+    , m_previewMode(QuickInspectorInterface::FullWindow)
 {
     setName(QStringLiteral("com.kdab.GammaRay.QuickRemoteView"));
 
@@ -123,6 +125,17 @@ QuickScenePreviewWidget::QuickScenePreviewWidget(QuickInspectorInterface *inspec
     m_toolBar.toolbarWidget->addActions(m_toolBar.visualizeGroup->actions());
     connect(m_toolBar.visualizeGroup, SIGNAL(triggered(QAction*)), this,
             SLOT(visualizeActionTriggered(QAction*)));
+
+    m_toolBar.toolbarWidget->addSeparator();
+
+    //TODO add icon
+    auto previewItem = new QAction(QIcon(""), tr("Preview only the selected item"), this);
+    previewItem->setCheckable(true);
+    connect(previewItem, &QAction::toggled, this, [this](bool checked) {
+        m_previewMode = checked ? QuickInspectorInterface::Item : QuickInspectorInterface::FullWindow;
+        m_inspectorInterface->setPreviewMode(m_previewMode);
+    });
+    m_toolBar.toolbarWidget->addAction(previewItem);
 
     m_toolBar.toolbarWidget->addSeparator();
 
@@ -204,6 +217,10 @@ void QuickScenePreviewWidget::resizeEvent(QResizeEvent *e)
 
 void QuickScenePreviewWidget::drawDecoration(QPainter *p)
 {
+    if (m_previewMode == QuickInspectorInterface::Item) {
+        return;
+    }
+
     updateEffectiveGeometry();
     p->save();
 

@@ -52,6 +52,8 @@ public slots:
     Q_DECL_OVERRIDE;
 
     void checkFeatures() Q_DECL_OVERRIDE;
+
+    void setPreviewMode(GammaRay::QuickInspectorInterface::PreviewMode mode) Q_DECL_OVERRIDE;
 };
 }
 

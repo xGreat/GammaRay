@@ -86,6 +86,7 @@ private:
 
     QuickInspectorInterface *m_inspectorInterface;
     QuickItemGeometry m_effectiveGeometry; // scaled and translated
+    QuickInspectorInterface::PreviewMode m_previewMode;
 };
 } // namespace GammaRay
 

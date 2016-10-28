@@ -82,6 +82,8 @@ public slots:
 
     void checkFeatures() Q_DECL_OVERRIDE;
 
+    void setPreviewMode(GammaRay::QuickInspectorInterface::PreviewMode mode) Q_DECL_OVERRIDE;
+
     void requestElementsAt(const QPoint &pos, GammaRay::RemoteViewInterface::RequestMode mode);
     void pickElementId(const GammaRay::ObjectId& id);
 
@@ -139,6 +141,7 @@ private:
         QQuickWindow *window;
         QMutex mutex;
     } m_pendingRenderMode;
+    PreviewMode m_previewMode;
 };
 
 class QuickInspectorFactory : public QObject,
