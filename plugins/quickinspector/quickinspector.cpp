@@ -549,6 +549,18 @@ void QuickInspector::checkOverlaySettings()
     emit overlaySettings(m_overlay->settings());
 }
 
+static QModelIndex transitiveMapFromSource(const QModelIndex &srcIdx, const QAbstractItemModel *dstModel)
+{
+    if (!srcIdx.isValid())
+        return srcIdx;
+    if (srcIdx.model() == dstModel || !dstModel)
+        return srcIdx;
+    const auto proxy = qobject_cast<const QAbstractProxyModel*>(dstModel);
+    Q_ASSERT(proxy);
+    const auto idx = transitiveMapFromSource(srcIdx, proxy->sourceModel());
+    return proxy->mapFromSource(idx);
+}
+
 void QuickInspector::itemSelectionChanged(const QItemSelection &selection)
 {
     const QModelIndex index = selection.value(0).topLeft();
@@ -560,8 +572,7 @@ void QuickInspector::itemSelectionChanged(const QItemSelection &selection)
     if (m_sgModel->itemForSgNode(m_currentSgNode) != m_currentItem) {
         m_currentSgNode = m_sgModel->sgNodeForItem(m_currentItem);
         const auto sourceIdx = m_sgModel->indexForNode(m_currentSgNode);
-        auto proxy = qobject_cast<const QAbstractProxyModel *>(m_sgSelectionModel->model());
-        m_sgSelectionModel->select(proxy->mapFromSource(sourceIdx),
+        m_sgSelectionModel->select(transitiveMapFromSource(sourceIdx, m_sgSelectionModel->model()),
                                    QItemSelectionModel::Select
                                    |QItemSelectionModel::Clear
                                    |QItemSelectionModel::Rows
