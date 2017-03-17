@@ -29,7 +29,10 @@
 #ifndef GAMMARAY_SERVERPROXYMODEL_H
 #define GAMMARAY_SERVERPROXYMODEL_H
 
+#include "changesignalbypassproxy.h"
+
 #include <common/modelevent.h>
+#include <common/objectmodel.h> // ### temporary
 
 #include <QCoreApplication>
 #include <QPointer>
@@ -47,8 +50,18 @@ public:
     explicit ServerProxyModel(QObject *parent = nullptr)
         : BaseProxy(parent)
         , m_sourceModel(nullptr)
+        , m_bypassProxy(new ChangeSignalBypassProxy(this))
         , m_active(false)
     {
+        // ### just for testing, move to outside
+        addBypassRole(ObjectModel::UserRole);
+        addBypassRole(ObjectModel::UserRole + 1);
+        addBypassRole(ObjectModel::UserRole + 2);
+
+        BaseProxy::setSourceModel(m_bypassProxy);
+#if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
+        BaseProxy::connect(m_bypassProxy, &ChangeSignalBypassProxy::dataChangeBypassed, this, &ServerProxyModel<BaseProxy>::sourceDataChangeBypass);
+#endif
     }
 
     /** Additional roles used from the source model for transfer to the client. */
@@ -65,10 +78,19 @@ public:
         m_extraProxyRoles.push_back(role);
     }
 
+    /** Adds a role that does not affect sorting or filtering at all.
+     *  This allows bypassing @tparam BaseProxy for such changes, which
+     *  avoids expensive layout changes.
+     */
+    void addBypassRole(int role)
+    {
+        m_bypassProxy->addBypassRole(role);
+    }
+
     QMap<int, QVariant> itemData(const QModelIndex &index) const override
     {
-        const QModelIndex sourceIndex = BaseProxy::mapToSource(index);
-        auto d = BaseProxy::sourceModel()->itemData(sourceIndex);
+        const QModelIndex sourceIndex = m_bypassProxy->mapToSource(BaseProxy::mapToSource(index));
+        auto d = m_sourceModel->itemData(sourceIndex);
         foreach (int role, m_extraRoles)
             d.insert(role, sourceIndex.data(role));
         foreach (int role, m_extraProxyRoles)
@@ -81,7 +103,7 @@ public:
         m_sourceModel = sourceModel;
         if (m_active && sourceModel) {
             Model::used(sourceModel);
-            BaseProxy::setSourceModel(sourceModel);
+            doSetSourceModel(sourceModel);
         }
     }
 
@@ -100,19 +122,33 @@ protected:
             m_active = mev->used();
             if (m_sourceModel) {
                 QCoreApplication::sendEvent(m_sourceModel, event);
-                if (mev->used() && BaseProxy::sourceModel() != m_sourceModel)
-                    BaseProxy::setSourceModel(m_sourceModel);
+                if (mev->used() && m_bypassProxy->sourceModel() != m_sourceModel)
+                    doSetSourceModel(m_sourceModel);
                 else if (!mev->used())
-                    BaseProxy::setSourceModel(nullptr);
+                    doSetSourceModel(nullptr);
             }
         }
         BaseProxy::customEvent(event);
     }
 
 private:
+    void doSetSourceModel(QAbstractItemModel *model)
+    {
+        m_bypassProxy->setSourceModel(model);
+    }
+
+    void sourceDataChangeBypass(const QModelIndex &srcTopLeft, const QModelIndex &srcBottomRight, const QVector<int> &roles)
+    {
+        const auto topLeft = BaseProxy::mapFromSource(srcTopLeft);
+        const auto bottomRight = BaseProxy::mapFromSource(srcBottomRight);
+        if (topLeft.isValid() && bottomRight.isValid())
+            emit BaseProxy::dataChanged(topLeft, bottomRight, roles);
+    }
+
     QVector<int> m_extraRoles;
     QVector<int> m_extraProxyRoles;
     QPointer<QAbstractItemModel> m_sourceModel;
+    ChangeSignalBypassProxy *m_bypassProxy;
     bool m_active;
 };
 }
