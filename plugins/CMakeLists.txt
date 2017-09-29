@@ -19,6 +19,10 @@ else()
   add_subdirectory(objectvisualizer)
 endif()
 
+if(Qt5Gui_FOUND)
+  add_subdirectory(accessibility)
+endif()
+
 if(Qt5Gui_FOUND OR QT_QTGUI_FOUND)
   add_subdirectory(guisupport)
   add_subdirectory(textdocumentinspector)

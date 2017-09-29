@@ -1,0 +1,7 @@
+{
+    "id": "gammaray_accessibility",
+    "name": "Accessibility",
+    "types": [
+        "QGuiApplication"
+    ]
+}
