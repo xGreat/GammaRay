@@ -42,7 +42,7 @@ private slots:
         ProbeABI abi;
         QVERIFY(!abi.isValid());
 
-        abi.setQtVersion(5, 2);
+        abi.setQtVersion(5, 2, 0);
         QVERIFY(!abi.isValid());
 
         abi.setArchitecture(QStringLiteral("x86_64"));
@@ -62,21 +62,22 @@ private slots:
         QTest::addColumn<QString>("id", nullptr);
         QTest::addColumn<int>("majorVersion", nullptr);
         QTest::addColumn<int>("minorVersion", nullptr);
+        QTest::addColumn<int>("patchVersion", nullptr);
         QTest::addColumn<bool>("isDebug", nullptr);
         QTest::addColumn<QString>("arch", nullptr);
         QTest::addColumn<QString>("compiler", nullptr);
         QTest::addColumn<QString>("compilerVersion", nullptr);
 
-        QTest::newRow("invalid") << QString() << -1 << -1 << false << QString() << QString() << QString();
+        QTest::newRow("invalid") << QString() << -1 << -1 << -1 << false << QString() << QString() << QString();
 #ifndef Q_OS_WIN
 #if defined(Q_OS_MAC)
-        QTest::newRow("mac") << "qt5_2-x86_64_debug" << 5 << 2 << true << "x86_64" << "CLANG" << QString();
+        QTest::newRow("mac") << "qt5_2_0-x86_64_debug" << 5 << 2 << 0 << true << "x86_64" << "CLANG" << QString();
 #else
-        QTest::newRow("unix") << "qt5_2-x86_64" << 5 << 2 << true << "x86_64" << "GCC" << QString();
+        QTest::newRow("unix") << "qt5_2_1-x86_64" << 5 << 2 << 1 << true << "x86_64" << "GCC" << QString();
 #endif
 #else
-        QTest::newRow("msvc") << "qt5_2-MSVC-140-x86_64d" << 5 << 2 << true << "x86_64" << "MSVC" << "140";
-        QTest::newRow("mingw") << "qt5_2-GNU-i686" << 5 << 2 << false << "i686" << "GNU" << QString();
+        QTest::newRow("msvc") << "qt5_2_2-MSVC-140-x86_64d" << 5 << 2 << 2 << true << "x86_64" << "MSVC" << "140";
+        QTest::newRow("mingw") << "qt5_2_3-GNU-i686" << 5 << 2 << 3 << false << "i686" << "GNU" << QString();
 #endif
     }
 
@@ -85,13 +86,14 @@ private slots:
         QFETCH(QString, id);
         QFETCH(int, majorVersion);
         QFETCH(int, minorVersion);
+        QFETCH(int, patchVersion);
         QFETCH(bool, isDebug);
         QFETCH(QString, arch);
         QFETCH(QString, compiler);
         QFETCH(QString, compilerVersion);
 
         ProbeABI abi;
-        abi.setQtVersion(majorVersion, minorVersion);
+        abi.setQtVersion(majorVersion, minorVersion, patchVersion);
         abi.setIsDebug(isDebug);
         abi.setArchitecture(arch);
         abi.setCompiler(compiler);
@@ -106,32 +108,33 @@ private slots:
         QTest::addColumn<bool>("valid", nullptr);
         QTest::addColumn<int>("majorVersion", nullptr);
         QTest::addColumn<int>("minorVersion", nullptr);
+        QTest::addColumn<int>("patchVersion", nullptr);
         QTest::addColumn<bool>("isDebug", nullptr);
         QTest::addColumn<QString>("arch", nullptr);
         QTest::addColumn<QString>("compiler", nullptr);
         QTest::addColumn<QString>("compilerVersion", nullptr);
 
-        QTest::newRow("invalid") << QString() << false << -1 << -1 << false << QString()
+        QTest::newRow("invalid") << QString() << false << -1 << -1 << -1 << false << QString()
                                  << QString() << QString();
-        QTest::newRow("only version") << "qt5_2" << false << -1 << -1 << false << QString()
+        QTest::newRow("only version") << "qt5_2" << false << -1 << -1 << -1 << false << QString()
                                       << QString() << QString();
         QTest::newRow("too many items") << "qt5_2-some-random-stuff-with-too-many-dashs" << false
-                                        << -1 << -1 << false << QString() << QString() << QString();
-        QTest::newRow("extra debug/release") << "qt5_2-MSVC-140-release-i686" << false << -1 << -1
+                                        << -1 << -1 << -1 << false << QString() << QString() << QString();
+        QTest::newRow("extra debug/release") << "qt5_2-MSVC-140-release-i686" << false << -1 << -1 << -1
                                              << false << QString() << QString() << QString();
-        QTest::newRow("extra debug/release") << "qt5_2-GNU-debug-arm" << false << -1 << -1
+        QTest::newRow("extra debug/release") << "qt5_2_3-GNU-debug-arm" << false << -1 << -1 << -1
                                              << false << QString() << QString() << QString();
 #ifndef Q_OS_WIN
 #if defined(Q_OS_MAC)
-        QTest::newRow("mac") << "qt5_2-x86_64_debug" << true << 5 << 2 << true << "x86_64"
+        QTest::newRow("mac") << "qt5_2_1-x86_64_debug" << true << 5 << 2 << 1 << true << "x86_64"
                              << "CLANG" << QString();
 #else
-        QTest::newRow("unix") << "qt5_2-x86_64" << true << 5 << 2 << true << "x86_64" << "GCC" << QString();
+        QTest::newRow("unix") << "qt5_2_0-x86_64" << true << 5 << 2 << 0 << true << "x86_64" << "GCC" << QString();
 #endif
 #else
-        QTest::newRow("msvc") << "qt5_2-MSVC-140-x86_64d" << true << 5 << 2 << true << "x86_64"
+        QTest::newRow("msvc") << "qt5_2_3-MSVC-140-x86_64d" << true << 5 << 2 << 3 << true << "x86_64"
                               << "MSVC" << "140";
-        QTest::newRow("mingw") << "qt5_2-GNU-i686d" << true << 5 << 2 << true << "i686" << "GNU" << QString();
+        QTest::newRow("mingw") << "qt5_2_0-GNU-i686d" << true << 5 << 2 << 0 << true << "i686" << "GNU" << QString();
 #endif
     }
 
@@ -141,6 +144,7 @@ private slots:
         QFETCH(bool, valid);
         QFETCH(int, majorVersion);
         QFETCH(int, minorVersion);
+        QFETCH(int, patchVersion);
         QFETCH(bool, isDebug);
         QFETCH(QString, arch);
         QFETCH(QString, compiler);
@@ -154,6 +158,7 @@ private slots:
 
         QCOMPARE(abi.majorQtVersion(), majorVersion);
         QCOMPARE(abi.minorQtVersion(), minorVersion);
+        QCOMPARE(abi.patchQtVersion(), patchVersion);
         QCOMPARE(abi.architecture(), arch);
         if (abi.isDebugRelevant()) {
             QCOMPARE(abi.isDebug(), isDebug);
@@ -174,13 +179,13 @@ private slots:
         QTest::newRow("invalid") << QString() << QString();
 #ifndef Q_OS_WIN
 #if defined(Q_OS_MAC)
-        QTest::newRow("mac") << "qt5_2-x86_64_debug" << "Qt 5.2 (debug, x86_64)";
+        QTest::newRow("mac") << "qt5_2_0-x86_64_debug" << "Qt 5.2.0 (debug, x86_64)";
 #else
-        QTest::newRow("unix") << "qt5_2-x86_64" << "Qt 5.2 (x86_64)";
+        QTest::newRow("unix") << "qt5_2_1-x86_64" << "Qt 5.2.1 (x86_64)";
 #endif
 #else
-        QTest::newRow("msvc") << "qt5_2-MSVC-140-x86_64d" << "Qt 5.2 (MSVC, 140, debug, x86_64)";
-        QTest::newRow("mingw") << "qt5_2-GNU-i686d" << "Qt 5.2 (GNU, debug, i686)";
+        QTest::newRow("msvc") << "qt5_2_2-MSVC-140-x86_64d" << "Qt 5.2.2 (MSVC, 140, debug, x86_64)";
+        QTest::newRow("mingw") << "qt5_2_3-GNU-i686d" << "Qt 5.2.3 (GNU, debug, i686)";
 #endif
     }
 
@@ -196,8 +201,8 @@ private slots:
     void testProbeABICompat()
     {
 #ifndef Q_OS_WIN
-        const ProbeABI targetABI = ProbeABI::fromString(QStringLiteral("qt5_2-x86_64"));
-        const ProbeABI probeABI = ProbeABI::fromString(QStringLiteral("qt5_1-x86_64"));
+        const ProbeABI targetABI = ProbeABI::fromString(QStringLiteral("qt5_2_0-x86_64"));
+        const ProbeABI probeABI = ProbeABI::fromString(QStringLiteral("qt5_1_1-x86_64"));
 #if defined(Q_OS_MAC)
         const bool debugAbiMatters = true;
 #else
@@ -205,23 +210,23 @@ private slots:
 #endif
         const bool compilerAbiMatters = false;
 #else
-        const ProbeABI targetABI = ProbeABI::fromString(QStringLiteral("qt5_2-MSVC-140-x86_64"));
-        const ProbeABI probeABI = ProbeABI::fromString(QStringLiteral("qt5_1-MSVC-140-x86_64"));
+        const ProbeABI targetABI = ProbeABI::fromString(QStringLiteral("qt5_2_0-MSVC-140-x86_64"));
+        const ProbeABI probeABI = ProbeABI::fromString(QStringLiteral("qt5_1_1-MSVC-140-x86_64"));
         const bool debugAbiMatters = true;
         const bool compilerAbiMatters = true;
 #endif
 
-        // full match, or same major version and older probe
+        // full match
         QVERIFY(targetABI.isCompatible(targetABI));
-        QVERIFY(targetABI.isCompatible(probeABI));
 
         // incompatible
-        // newer minor version probe
+        // different minor version probe
+        QVERIFY(!targetABI.isCompatible(probeABI));
         QVERIFY(!probeABI.isCompatible(targetABI));
 
         // different major version
         ProbeABI incompatABI(probeABI);
-        incompatABI.setQtVersion(4, 8);
+        incompatABI.setQtVersion(4, 8, 0);
         QVERIFY(!targetABI.isCompatible(incompatABI));
         QVERIFY(!incompatABI.isCompatible(targetABI));
 
@@ -244,16 +249,21 @@ private slots:
     void testProbeABISort()
     {
         ProbeABI qt52;
-        qt52.setQtVersion(5, 2);
-        ProbeABI qt51;
-        qt51.setQtVersion(5, 1);
+        qt52.setQtVersion(5, 2, 0);
+        ProbeABI qt510;
+        qt510.setQtVersion(5, 1, 0);
+        ProbeABI qt511;
+        qt511.setQtVersion(5, 1, 1);
         ProbeABI qt48;
-        qt48.setQtVersion(4, 8);
+        qt48.setQtVersion(4, 8, 0);
 
-        QVERIFY(qt51 < qt52);
+        QVERIFY(qt510 < qt52);
+        QVERIFY(qt511 < qt52);
+        QVERIFY(qt510 < qt511);
         QVERIFY(qt48 < qt52);
-        QVERIFY(!(qt52 < qt51));
-        QVERIFY(!(qt51 < qt48));
+        QVERIFY(!(qt52 < qt511));
+        QVERIFY(!(qt511 < qt510));
+        QVERIFY(!(qt510 < qt48));
 
         QVERIFY(!(qt52 < qt52));
     }

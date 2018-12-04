@@ -218,7 +218,8 @@ static ProbeABI abiFromMachO(const QString &path, const uchar *data, qint64 size
             const dylib_command *dlcmd = reinterpret_cast<const dylib_command *>(data + offset);
             const int majorVersion = (dlcmd->dylib.current_version & 0x00ff0000) >> 16;
             const int minorVersion = (dlcmd->dylib.current_version & 0x0000ff00) >> 8;
-            abi.setQtVersion(majorVersion, minorVersion);
+            const int patchVersion = (dlcmd->dylib.current_version & 0x0000ff00) >> 0;
+            abi.setQtVersion(majorVersion, minorVersion, patchVersion);
         }
         offset += cmd->cmdsize;
     }

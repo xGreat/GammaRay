@@ -107,7 +107,7 @@ static ProbeABI qtVersionFromFileName(const QString &path)
     if (parts.size() < 4 || parts.at(parts.size() - 4) != QLatin1String("so"))
         return abi;
 
-    abi.setQtVersion(parts.at(parts.size() - 3).toInt(), parts.at(parts.size() - 2).toInt());
+    abi.setQtVersion(parts.at(parts.size() - 3).toInt(), parts.at(parts.size() - 2).toInt(), parts.at(parts.size() - 1).toInt());
     return abi;
 }
 
@@ -127,7 +127,7 @@ static ProbeABI qtVersionFromExec(const QString &path)
     if (version.size() < 3)
         return abi;
 
-    abi.setQtVersion(version.at(0).toInt(), version.at(1).toInt());
+    abi.setQtVersion(version.at(0).toInt(), version.at(1).toInt(), version.at(2).toInt());
 
     return abi;
 }

@@ -101,12 +101,14 @@ static QString resolveImport(const QString &import, const QStringList &searchPat
     return QString();
 }
 struct Version {
-    Version(int major, int minor)
+    Version(int major, int minor, int patch)
         : major(major)
         , minor(minor)
+        , patch(patch)
     {}
     int major;
     int minor;
+    int patch;
 };
 
 static Version fileVersion(const QString &path)
@@ -125,11 +127,11 @@ static Version fileVersion(const QString &path)
                               &versionInfoSize) && versionInfoSize) {
                 VS_FIXEDFILEINFO *versionInfo = reinterpret_cast<VS_FIXEDFILEINFO *>(versionInfoData);
                 if (versionInfo->dwSignature == VS_FFI_SIGNATURE)
-                    return Version(versionInfo->dwFileVersionMS >> 16, versionInfo->dwFileVersionMS & 0xFFFF);
+                    return Version(versionInfo->dwFileVersionMS >> 16, versionInfo->dwFileVersionMS & 0xFFFF, versionInfo->dwFileVersionLS >> 16);
             }
         }
     }
-    return Version(-1, -1);
+    return Version(-1, -1, -1);
 }
 QString ProbeABIDetector::qtCoreForExecutable(const QString &path) const
 {
@@ -225,7 +227,7 @@ ProbeABI ProbeABIDetector::detectAbiForQtCore(const QString &path) const
     if (version.major == -1)
         return abi;
 
-    abi.setQtVersion(version.major, version.minor);
+    abi.setQtVersion(version.major, version.minor, version.patch);
 
     // architecture and dependent libraries
     PEFile f(path);

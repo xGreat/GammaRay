@@ -52,7 +52,8 @@ public:
     /*! Qt version. */
     int majorQtVersion() const;
     int minorQtVersion() const;
-    void setQtVersion(int major, int minor);
+    int patchQtVersion() const;
+    void setQtVersion(int major, int minor, int patch);
     bool hasQtVersion() const;
 
     /*! Processor architecture. */

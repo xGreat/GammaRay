@@ -50,6 +50,7 @@ public:
     ProbeABIPrivate()
         : majorQtVersion(-1)
         , minorQtVersion(-1)
+        , patchQtVersion(-1)
         , isDebug(false)
     {}
 
@@ -60,6 +61,7 @@ public:
         , compilerVersion(other.compilerVersion)
         , majorQtVersion(other.majorQtVersion)
         , minorQtVersion(other.minorQtVersion)
+        , patchQtVersion(other.patchQtVersion)
         , isDebug(other.isDebug)
     {}
 
@@ -68,6 +70,7 @@ public:
     QString compilerVersion;
     int majorQtVersion;
     int minorQtVersion;
+    int patchQtVersion;
     bool isDebug;
 };
 }
@@ -104,15 +107,21 @@ int ProbeABI::minorQtVersion() const
     return d->minorQtVersion;
 }
 
-void ProbeABI::setQtVersion(int major, int minor)
+int ProbeABI::patchQtVersion() const
+{
+    return d->patchQtVersion;
+}
+
+void ProbeABI::setQtVersion(int major, int minor, int patch)
 {
     d->majorQtVersion = major;
     d->minorQtVersion = minor;
+    d->patchQtVersion = patch;
 }
 
 bool ProbeABI::hasQtVersion() const
 {
-    return d->majorQtVersion > 0 && d->minorQtVersion >= 0;
+    return d->majorQtVersion > 0 && d->minorQtVersion >= 0 && d->patchQtVersion >= 0;
 }
 
 QString ProbeABI::architecture() const
@@ -183,7 +192,8 @@ bool ProbeABI::isValid() const
 bool ProbeABI::isCompatible(const ProbeABI &referenceABI) const
 {
     return d->majorQtVersion == referenceABI.majorQtVersion()
-           && d->minorQtVersion >= referenceABI.minorQtVersion() // we can work with older probes, since the target defines the Qt libraries being used
+           && d->minorQtVersion == referenceABI.minorQtVersion()
+           && d->patchQtVersion == referenceABI.patchQtVersion() // we use qt private API, so we have to have an exact match
            && d->architecture == referenceABI.architecture()
 #ifdef Q_OS_WIN
            && d->compiler == referenceABI.compiler()
@@ -199,7 +209,7 @@ QString ProbeABI::id() const
         return QString();
 
     QStringList idParts;
-    idParts.push_back(QStringLiteral("qt%1_%2").arg(majorQtVersion()).arg(minorQtVersion()));
+    idParts.push_back(QStringLiteral("qt%1_%2_%3").arg(majorQtVersion()).arg(minorQtVersion()).arg(patchQtVersion()));
 
 #ifdef Q_OS_WIN
     idParts.push_back(compiler());
@@ -223,10 +233,10 @@ ProbeABI ProbeABI::fromString(const QString &id)
     ProbeABI abi;
 
     // version
-    static QRegExp versionRegExp("^qt(\\d+)\\_(\\d+)$");
+    static QRegExp versionRegExp("^qt(\\d+)\\_(\\d+)_(\\d+)$");
     if (versionRegExp.indexIn(idParts.value(index++)) != 0)
         return ProbeABI();
-    abi.setQtVersion(versionRegExp.cap(1).toInt(), versionRegExp.cap(2).toInt());
+    abi.setQtVersion(versionRegExp.cap(1).toInt(), versionRegExp.cap(2).toInt(), versionRegExp.cap(3).toInt());
 
     // compiler
 #ifdef Q_OS_WIN
@@ -271,9 +281,10 @@ QString ProbeABI::displayString() const
 
     details.push_back(architecture());
 
-    return ProbeABIContext::tr("Qt %1.%2 (%3)")
+    return ProbeABIContext::tr("Qt %1.%2.%3 (%4)")
            .arg(majorQtVersion())
            .arg(minorQtVersion())
+           .arg(patchQtVersion())
            .arg(details.join(QStringLiteral(", ")));
 }
 
@@ -281,6 +292,7 @@ bool ProbeABI::operator==(const ProbeABI &rhs) const
 {
     return majorQtVersion() == rhs.majorQtVersion()
            && minorQtVersion() == rhs.minorQtVersion()
+           && patchQtVersion() == rhs.patchQtVersion()
            && architecture() == rhs.architecture()
            && compiler() == rhs.compiler()
            && compilerVersion() == rhs.compilerVersion()
@@ -289,7 +301,9 @@ bool ProbeABI::operator==(const ProbeABI &rhs) const
 
 bool ProbeABI::operator<(const ProbeABI &rhs) const
 {
-    if (majorQtVersion() == rhs.majorQtVersion())
+    if (majorQtVersion() != rhs.majorQtVersion())
+        return majorQtVersion() < rhs.majorQtVersion();
+    if (minorQtVersion() != rhs.minorQtVersion())
         return minorQtVersion() < rhs.minorQtVersion();
-    return majorQtVersion() < rhs.majorQtVersion();
+    return patchQtVersion() < rhs.patchQtVersion();
 }

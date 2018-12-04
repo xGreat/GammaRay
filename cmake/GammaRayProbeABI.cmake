@@ -34,9 +34,9 @@
 
 # Qt version
 if(Qt5Core_FOUND)
-  set(GAMMARAY_PROBE_ABI "qt${Qt5Core_VERSION_MAJOR}_${Qt5Core_VERSION_MINOR}")
+  set(GAMMARAY_PROBE_ABI "qt${Qt5Core_VERSION_MAJOR}_${Qt5Core_VERSION_MINOR}_${Qt5Core_VERSION_PATCH}")
 else()
-  set(GAMMARAY_PROBE_ABI "qt${QT_VERSION_MAJOR}_${QT_VERSION_MINOR}")
+  set(GAMMARAY_PROBE_ABI "qt${QT_VERSION_MAJOR}_${QT_VERSION_MINOR}_${QT_VERSION_PATCH}")
 endif()
 
 # on Windows, the compiler also matters
