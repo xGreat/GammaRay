@@ -616,6 +616,14 @@ endif()
 # this needs to be run after we know exactly what we are building, but is needed for that installation settings
 include(GammaRayProbeABI)
 
+if (NOT GAMMARAY_CLIENT_ONLY_BUILD)
+    if (GAMMARAY_STATIC_PROBE)
+        add_feature_info("Static Probe ${GAMMARAY_PROBE_ABI}" TRUE "Linking to the static probe to enable GammaRay for your application.")
+    else()
+        add_feature_info("Probe ${GAMMARAY_PROBE_ABI}" TRUE "Allows to use GammaRay on applications that use Qt with ABI version ${GAMMARAY_PROBE_ABI}.")
+    endif()
+endif()
+
 #
 # Installation settings
 #
@@ -908,6 +916,7 @@ elseif(UNIX)
 endif()
 
 include(CPack)
+
 
 feature_summary(WHAT ALL INCLUDE_QUIET_PACKAGES FATAL_ON_MISSING_REQUIRED_PACKAGES)
 
