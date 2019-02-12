@@ -6,48 +6,21 @@ configure_file(gammaray-test-config.h.in ${CMAKE_CURRENT_BINARY_DIR}/gammaray-te
 
 # create intermediate modeltestobj object files which unit tests can use
 add_library(modeltestobj OBJECT ${CMAKE_SOURCE_DIR}/3rdparty/qt/modeltest.cpp)
-set_target_properties(modeltestobj PROPERTIES POSITION_INDEPENDENT_CODE ON)
-target_compile_features(modeltestobj PUBLIC ${GAMMARAY_REQUIRED_CXX_FEATURES})
-target_compile_definitions(modeltestobj PRIVATE ${Qt5Core_DEFINITIONS}) # for -DQT_NAMESPACE=...
-target_include_directories(modeltestobj PUBLIC ${Qt5Core_INCLUDE_DIRS})
+target_link_libraries(modeltestobj PUBLIC Qt5::Core)
 
 # create intermediate test_helpers_obj object files which unit tests can use
 add_library(test_helpers_obj OBJECT testhelpers.cpp)
-set_target_properties(test_helpers_obj PROPERTIES POSITION_INDEPENDENT_CODE ON)
-target_compile_features(test_helpers_obj PUBLIC ${GAMMARAY_REQUIRED_CXX_FEATURES})
-target_compile_definitions(test_helpers_obj PRIVATE ${Qt5Core_DEFINITIONS} ${Qt5Test_DEFINITIONS}) # for -DQT_NAMESPACE=...
-target_include_directories(test_helpers_obj PUBLIC
-  ${Qt5Core_INCLUDE_DIRS}
-  ${Qt5Test_INCLUDE_DIRS}
-)
+target_link_libraries(test_helpers_obj PUBLIC Qt5::Core Qt5::Test)
 
 if(NOT GAMMARAY_CLIENT_ONLY_BUILD)
 # create intermediate base_probe_test_obj object files which unit tests can use
 add_library(base_probe_test_obj OBJECT baseprobetest.h)
-set_target_properties(base_probe_test_obj PROPERTIES POSITION_INDEPENDENT_CODE ON)
-target_compile_features(base_probe_test_obj PUBLIC ${GAMMARAY_REQUIRED_CXX_FEATURES})
-target_include_directories(base_probe_test_obj PUBLIC
-  $<TARGET_PROPERTY:gammaray_core,INTERFACE_INCLUDE_DIRECTORIES>
-  $<TARGET_PROPERTY:gammaray_common,INTERFACE_INCLUDE_DIRECTORIES>
-)
-target_compile_definitions(base_probe_test_obj PRIVATE ${Qt5Core_DEFINITIONS} ${Qt5Test_DEFINITIONS}) # for -DQT_NAMESPACE=...
-target_include_directories(base_probe_test_obj PUBLIC
-  ${Qt5Core_INCLUDE_DIRS}
-  ${Qt5Test_INCLUDE_DIRS}
-)
+target_link_libraries(base_probe_test_obj gammaray_core gammaray_common Qt5::Core Qt5::Test)
 
 if(Qt5Quick_FOUND)
   # create intermediate base_quick_test_obj object files which unit tests can use
   add_library(base_quick_test_obj OBJECT basequicktest.h)
-  set_target_properties(base_quick_test_obj PROPERTIES POSITION_INDEPENDENT_CODE ON)
-  target_compile_features(base_quick_test_obj PUBLIC ${GAMMARAY_REQUIRED_CXX_FEATURES})
-  target_compile_definitions(base_quick_test_obj PRIVATE ${Qt5Core_DEFINITIONS} ${Qt5Test_DEFINITIONS} ${Qt5Quick_DEFINITIONS}) # for -DQT_NAMESPACE=...
-  target_include_directories(base_quick_test_obj PUBLIC
-    $<TARGET_PROPERTY:base_probe_test_obj,INTERFACE_INCLUDE_DIRECTORIES>
-  )
-  target_include_directories(base_quick_test_obj PUBLIC
-    ${Qt5Quick_INCLUDE_DIRS}
-  )
+  target_link_libraries(base_quick_test_obj PUBLIC base_probe_test_obj Qt5::Quick)
 endif()
 endif()
 
@@ -197,8 +170,7 @@ gammaray_add_test(propertymodeltest propertymodeltest.cpp $<TARGET_OBJECTS:model
 target_link_libraries(propertymodeltest gammaray_core gammaray_shared_test_data)
 
 gammaray_add_test(qmetaobjectvalidatortest qmetaobjectvalidatortest.cpp)
-target_include_directories(qmetaobjectvalidatortest SYSTEM PRIVATE ${Qt5Core_PRIVATE_INCLUDE_DIRS})
-target_link_libraries(qmetaobjectvalidatortest Qt5::Gui Qt5::Widgets gammaray_core)
+target_link_libraries(qmetaobjectvalidatortest Qt5::CorePrivate Qt5::Gui Qt5::Widgets gammaray_core)
 
 if(GAMMARAY_BUILD_UI)
   gammaray_add_test(metatypemodeltest
@@ -230,8 +202,7 @@ if(NOT GAMMARAY_CLIENT_ONLY_BUILD)
       ${CMAKE_SOURCE_DIR}/ui/tools/objectinspector/clientmethodmodel.cpp
       $<TARGET_OBJECTS:modeltestobj>
     )
-    target_include_directories(methodmodeltest SYSTEM PRIVATE ${Qt5Core_PRIVATE_INCLUDE_DIRS})
-    target_link_libraries(methodmodeltest gammaray_core Qt5::Gui Qt5::Widgets)
+    target_link_libraries(methodmodeltest gammaray_core Qt5::CorePrivate Qt5::Gui Qt5::Widgets)
   endif()
 endif()
 
@@ -388,8 +359,7 @@ if(NOT GAMMARAY_CLIENT_ONLY_BUILD)
       ${CMAKE_SOURCE_DIR}/plugins/qmlsupport/qjsvaluepropertyadaptor.cpp
       ${CMAKE_SOURCE_DIR}/plugins/qmlsupport/qmlcontextpropertyadaptor.cpp
     )
-    target_include_directories(qmlsupporttest SYSTEM PRIVATE ${Qt5Qml_PRIVATE_INCLUDE_DIRS})
-    target_link_libraries(qmlsupporttest gammaray_core Qt5::Quick)
+    target_link_libraries(qmlsupporttest gammaray_core Qt5::Quick Qt5::QmlPrivate)
   endif()
 
   if(Qt5Quick_FOUND AND NOT Qt5Quick_VERSION VERSION_LESS 5.7) # requires MSVC 2013 or higher
@@ -397,8 +367,7 @@ if(NOT GAMMARAY_CLIENT_ONLY_BUILD)
       bindinginspectortest.cpp
       $<TARGET_OBJECTS:modeltestobj>
     )
-    target_include_directories(bindinginspectortest SYSTEM PRIVATE ${Qt5Quick_PRIVATE_INCLUDE_DIRS})
-    target_link_libraries(bindinginspectortest gammaray_core Qt5::Quick)
+    target_link_libraries(bindinginspectortest gammaray_core Qt5::Quick Qt5::QuickPrivate)
     target_sources(bindinginspectortest PUBLIC
       ${CMAKE_SOURCE_DIR}/plugins/quickinspector/quickimplicitbindingdependencyprovider.cpp
     )
@@ -414,8 +383,7 @@ if(NOT GAMMARAY_CLIENT_ONLY_BUILD)
       quickinspectortest.qrc
         $<TARGET_OBJECTS:modeltestobj>
     )
-    target_include_directories(quickinspectortest SYSTEM PRIVATE ${Qt5Quick_PRIVATE_INCLUDE_DIRS})
-    target_link_libraries(quickinspectortest gammaray_core gammaray_quickinspector_shared Qt5::Quick)
+    target_link_libraries(quickinspectortest gammaray_core gammaray_quickinspector_shared Qt5::Quick Qt5::QuickPrivate)
 
     gammaray_add_quick_test(quickinspectortest2
       quickinspectortest2.cpp
@@ -457,8 +425,7 @@ if(NOT GAMMARAY_CLIENT_ONLY_BUILD)
       quickinspectortest.qrc
       $<TARGET_OBJECTS:modeltestobj>
     )
-    target_include_directories(quickmaterialtest SYSTEM PRIVATE ${Qt5Quick_PRIVATE_INCLUDE_DIRS})
-    target_link_libraries(quickmaterialtest gammaray_core Qt5::Quick)
+    target_link_libraries(quickmaterialtest gammaray_core Qt5::Quick Qt5::QuickPrivate)
   endif()
 
   if(Qt5IviCore_FOUND AND Qt5IviVehicleFunctions_FOUND AND Qt5IviCore_VERSION VERSION_LESS 1.2)
@@ -468,8 +435,7 @@ if(NOT GAMMARAY_CLIENT_ONLY_BUILD)
       ../plugins/qtivi/qtivipropertymodel.cpp
       $<TARGET_OBJECTS:modeltestobj>
     )
-    target_include_directories(qtivipropertymodeltest SYSTEM PRIVATE ${Qt5IviCore_PRIVATE_INCLUDE_DIRS})
-    target_link_libraries(qtivipropertymodeltest Qt5::Gui Qt5::IviCore Qt5::IviVehicleFunctions)
+    target_link_libraries(qtivipropertymodeltest Qt5::Gui Qt5::IviCore Qt5::IviCorePrivate Qt5::IviVehicleFunctions)
     if(Qt5IviMedia_FOUND)
       target_link_libraries(qtivipropertymodeltest Qt5::IviMedia)
     endif()

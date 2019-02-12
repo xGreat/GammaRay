@@ -9,13 +9,7 @@ list(APPEND gammaray_probe_srcs entry_unix.cpp)
 # create intermediate gammaray_probe object files which unit tests can use
 add_library(gammaray_probe_obj OBJECT ${gammaray_probe_srcs})
 set_target_properties(gammaray_probe_obj PROPERTIES POSITION_INDEPENDENT_CODE ON)
-target_compile_features(gammaray_probe_obj PUBLIC ${GAMMARAY_REQUIRED_CXX_FEATURES})
-target_compile_definitions(gammaray_probe_obj PRIVATE ${Qt5Core_DEFINITIONS}) # for -DQT_NAMESPACE=...
-target_include_directories(gammaray_probe_obj PUBLIC
-    $<TARGET_PROPERTY:gammaray_core,INTERFACE_INCLUDE_DIRECTORIES>
-    $<TARGET_PROPERTY:gammaray_common,INTERFACE_INCLUDE_DIRECTORIES>
-)
-target_include_directories(gammaray_probe_obj SYSTEM PRIVATE ${Qt5Core_PRIVATE_INCLUDE_DIRS})
+target_link_libraries(gammaray_probe_obj PUBLIC Qt5::Core Qt5::CorePrivate gammaray_core gammaray_common)
 
 # probe lib
 # DYLD_INSERT_LIBRARIES only works with real shared libraries, not modules

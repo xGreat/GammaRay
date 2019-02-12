@@ -118,14 +118,10 @@ target_compile_features(gammaray_core PUBLIC ${GAMMARAY_REQUIRED_CXX_FEATURES})
 
 gammaray_target_relocatable_interfaces(gammaray_core_ipaths)
 target_include_directories(gammaray_core PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}> $<INSTALL_INTERFACE:${gammaray_core_ipaths}>)
-target_include_directories(gammaray_core SYSTEM PRIVATE
-    ${CMAKE_SOURCE_DIR}/3rdparty/backward-cpp
-    ${Qt5Core_PRIVATE_INCLUDE_DIRS}
-    ${Qt5Gui_PRIVATE_INCLUDE_DIRS}
-)
+target_include_directories(gammaray_core SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/3rdparty/backward-cpp)
 target_link_libraries(gammaray_core
   LINK_PUBLIC gammaray_common
-  LINK_PRIVATE gammaray_common_internal gammaray_kitemmodels ${CMAKE_DL_LIBS}
+  LINK_PRIVATE gammaray_common_internal gammaray_kitemmodels Qt5::GuiPrivate Qt5::CorePrivate ${CMAKE_DL_LIBS}
 )
 set_target_properties(gammaray_core PROPERTIES
   ${GAMMARAY_DEFAULT_LIBRARY_PROPERTIES}

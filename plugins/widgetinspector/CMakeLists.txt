@@ -51,7 +51,6 @@ endif()
 target_link_libraries(gammaray_widget_export_actions
   Qt5::Core
   Qt5::Gui Qt5::Widgets
-  Qt5::Svg
   Qt5::PrintSupport
 
   ${EXTRA_LIBS}
