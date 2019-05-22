@@ -72,9 +72,16 @@ public:
         if (Q_UNLIKELY(payload().status() != QDataStream::Ok)) {
             qWarning("%s: Attempting to read from a non valid stream: status: %i", Q_FUNC_INFO, int(payload().status()));
         }
+        quint32 size;
+        payload() >> size;
+        int origPos = payload().device()->pos();
+
         payload() >> value;
         if (Q_UNLIKELY(payload().status() != QDataStream::Ok)) {
             qWarning("%s: Read from a non valid stream: status: %i", Q_FUNC_INFO, int(payload().status()));
+
+            payload().device()->skip((int)size - (payload().device()->pos() - origPos));
+            payload().resetStatus();
         }
         return *this;
     }
@@ -98,7 +105,14 @@ public:
         if (Q_UNLIKELY(payload().status() != QDataStream::Ok)) {
             qWarning("%s: Attempting to write to a non valid stream: status: %i", Q_FUNC_INFO, int(payload().status()));
         }
-        payload() << value;
+        QByteArray data;
+        QDataStream stream(&data, QIODevice::WriteOnly);
+        stream << value;
+
+        quint32 size = data.size();
+        Q_ASSERT(size > 0);
+        payload() << size;
+        payload().writeRawData(data.data(), size);
         if (Q_UNLIKELY(payload().status() != QDataStream::Ok)) {
             qWarning("%s: Write to a non valid stream: status: %i", Q_FUNC_INFO, int(payload().status()));
         }
