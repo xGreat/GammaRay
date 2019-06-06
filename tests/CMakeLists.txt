@@ -192,6 +192,10 @@ endif()
 gammaray_add_test(objectinstancetest objectinstancetest.cpp)
 target_link_libraries(objectinstancetest gammaray_core)
 
+gammaray_add_probe_test(objectwrappertest objectwrappertest.cpp)
+target_include_directories(objectwrappertest SYSTEM PRIVATE ${Qt5Core_PRIVATE_INCLUDE_DIRS})
+target_link_libraries(objectwrappertest gammaray_core)
+
 gammaray_add_test(propertysyncertest propertysyncertest.cpp)
 target_link_libraries(propertysyncertest gammaray_common Qt5::Gui)
 
