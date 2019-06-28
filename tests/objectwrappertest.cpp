@@ -47,50 +47,106 @@
 using namespace GammaRay;
 
 
-class Test : public QObject {
+class SimpleNonQObjectTestObject {
+public:
+    explicit SimpleNonQObjectTestObject(int x, int y) : m_x(x), y(y) {}
+
+    void setX(int x) { m_x = x; }
+
+    int x() const { return m_x; }
+    int y;
+
+private:
+    int m_x;
+};
+
+// class Foo {
+//
+//
+//     using value_type = SimpleNonQObjectTestObject;                                                                                                           \
+//     using ThisClass_t = Foo;
+//
+//     static constexpr int Flags = 0;
+//
+//     template<typename T1, typename T2>
+//     static typename std::enable_if<std::is_same<T1, T2>::value>::type noop(T1 *t1) { return t1; }
+//
+//     template<typename T = value_type> /* Dummy parameter to make SFINAE applicable */
+//     friend auto fetch_x(ThisClass_t *self, typename std::enable_if<std::is_same<T, value_type>::value && (Flags & LAMBDA_COMMAND) != 0>::type* = nullptr)
+//     -> decltype(wrap<Flags>(x(static_cast<T*>(nullptr))))
+//     {
+//         return wrap<Flags>(x(noop<T, value_type>(self)->object));
+//     }
+//     template<typename PrivateClass>
+//     friend auto fetch_x(ThisClass_t *self, typename std::enable_if<!std::is_same<PrivateClass, value_type>::value && (Flags & DptrMember) != 0>::type* = nullptr)
+//     -> decltype(wrap<Flags>(std::declval<PrivateClass>().x()))
+//     {
+//         return wrap<Flags>(PrivateClass::get(self->object)->x());
+//     }
+//     template<typename T = value_type>
+//     friend auto fetch_x(ThisClass_t *self, typename std::enable_if<std::is_same<T, value_type>::value && (Flags & Getter) != 0>::type* = nullptr)
+//     -> decltype(wrap<Flags>(std::declval<T>().x()))
+//     {
+//         return wrap<Flags>(noop<T, value_type>(self)->object->x());
+//     }
+//     template<typename T = value_type>
+//     friend auto fetch_x(ThisClass_t *self, typename std::enable_if<std::is_same<T, value_type>::value && (Flags & MemberVar) != 0>::type* = nullptr)
+//     -> decltype(wrap<Flags>(std::declval<T>().x))
+//     {
+//         return wrap<Flags>(noop<T, value_type>(self)->object->x);
+//     }
+//
+//     SimpleNonQObjectTestObject *object;
+// };
+
+
+class QObjectTestObject : public QObject {
     Q_OBJECT
-    Q_PROPERTY(int x READ xx WRITE setXX NOTIFY xxChanged)
-    Q_PROPERTY(int y READ yy WRITE setYY NOTIFY yyChanged)
-    Q_PROPERTY(QTimer *t MEMBER m_t)
+    Q_PROPERTY(int x READ x WRITE setXX NOTIFY xChanged)
+    Q_PROPERTY(int y READ y WRITE setYY NOTIFY yChanged)
+    Q_PROPERTY(QTimer *t MEMBER t)
 
 signals:
-    void xxChanged();
-    void yyChanged();
+    void xChanged();
+    void yChanged();
 
 public:
-    Test(Test *parent = nullptr) : QObject(parent), m_t(new QTimer(this)), m_parent(parent) {}
-    explicit Test(int x, int y, Test *parent = nullptr) : QObject(parent), m_t(new QTimer(this)), m_xx(x), m_yy(y), m_parent(parent) {}
-    virtual ~Test() {}
-    int xx() { return m_xx; }
-    int yy() { return m_yy; }
+    QObjectTestObject(QObjectTestObject *parent = nullptr) : QObject(parent), t(new QTimer(this)), m_parent(parent) {}
+    explicit QObjectTestObject(int x, int y, QObjectTestObject *parent = nullptr) : QObject(parent), t(new QTimer(this)), m_x(x), m_y(y), m_parent(parent) {}
+    virtual ~QObjectTestObject() {}
+    int x() const { return m_x; }
+    int y() const { return m_y; }
 
-    Test *parent() const { return m_parent; }
+    QObjectTestObject *parent() const { return m_parent; }
 
-    void setXX(int x) { m_xx = x; emit xxChanged(); }
-    void setYY(int y) { m_yy = y; emit yyChanged(); }
+    void setXX(int x) { m_x = x; emit xChanged(); }
+    void setYY(int y) { m_y = y; emit yChanged(); }
 
     QString str() { return QStringLiteral("Hello World"); }
-    QString echo(const QString &s) { return s; }
+    QString echo(const QString &s) const { return s; }
 
-    QTimer *m_t = nullptr;
+    QTimer *t = nullptr;
 
-    QVector<Test*> children() const
+    QVector<QObjectTestObject *> children() const
     {
         return m_children;
     }
 
-    QVector<Test*> m_children;
+    QVector<QObjectTestObject *> m_children;
 
 private:
-    int m_xx = 8;
-    int m_yy = 10;
-    Test *m_parent = nullptr;
+    int m_x = 8;
+    int m_y = 10;
+    QObjectTestObject *m_parent = nullptr;
 };
 
+int getChildrenCount(const QObjectTestObject *obj)
+{
+    return obj->children().size();
+}
 
-class LinkedList : public QObject {
-    Q_OBJECT
 
+class LinkedList {
 public:
     LinkedList() = default;
     LinkedList(int i) : m_i(i) {}
@@ -121,22 +177,44 @@ private:
 //     std::unique_ptr<QObject> mainThreadObj;
 // };
 
-namespace GammaRay {
-DECLARE_OBJECT_WRAPPER(QTimer, QPROP_MEMBER(active, isActive()))
-DECLARE_OBJECT_WRAPPER(Test,
-                       QPROP_MEMBER(x, xx())
-                       MEMBER_WITH_NOTIFY(y, yy(), yyChanged)
-                       MEMBER(str, str())
-                       MEMBER(halloDu, echo("Hello, you."))
-                       MEMBER(t, m_t)
-                       MEMBER(children, children())
-                       MEMBER(parent, parent()) // TODO: Create separated test case for this. Where is the incomplete type actually an issue?
+class DisabledCachingTestObject
+{
+public:
+    int x() const
+    {
+        ++m_callCount;
+        return m_x;
+    }
+
+    mutable int m_callCount = 0;
+    int m_x = 42;
+};
+
+DECLARE_OBJECT_WRAPPER(SimpleNonQObjectTestObject,
+                       PROP(x, Getter)
+                       PROP(y, MemberVar)
+)
+DECLARE_OBJECT_WRAPPER(QTimer, PROP(isActive, Getter))
+DECLARE_OBJECT_WRAPPER(QObjectTestObject,
+                       PROP(x, Getter | QProp)
+                       PROP(y, Getter | QProp)
+                       PROP(str, NonConstGetter)
+                       LAMBDA_PROP(halloDu, [](const QObjectTestObject *obj) { return obj->echo("Hello, you."); }, CustomCommand)
+                       PROP(t, MemberVar | OwningPointer)
+                       PROP(children, Getter | OwningPointer)
+                       PROP(parent, Getter | NonOwningPointer)
+                       LAMBDA_PROP(childrenCount, [](const QObjectTestObject *obj) { return getChildrenCount(obj); }, CustomCommand)
 )
 DECLARE_OBJECT_WRAPPER(LinkedList,
-                       MEMBER(i, i())
-                       MEMBER(prev, prev())
-                       MEMBER(next, next()) // TODO: Create separated test case for this. Where is the incomplete type actually an issue?
+                       PROP(i, Getter)
+                       PROP(prev, Getter | NonOwningPointer)
+                       PROP(next, Getter | OwningPointer)
 )
+DECLARE_OBJECT_WRAPPER(DisabledCachingTestObject,
+                       DISABLE_CACHING
+                       PROP(x, Getter)
+)
+namespace GammaRay {
 
 class ObjectWrapperTest : public BaseProbeTest
 {
@@ -152,144 +230,212 @@ private slots:
 //         ObjectShadowDataRepository::instance()->m_objectToWrapperControlBlockMap.clear(); // FIXME this should not be necessary!
     }
 
-    void testCleanup()
-    {
-        QCOMPARE(ObjectShadowDataRepository::instance()->m_objectToWrapperControlBlockMap.size(), 0);
-        {
-            Test t;
-            t.m_children = QVector<Test *> { new Test {1, 2, &t}, new Test {3, 4, &t} };
-            ObjectHandle<Test> w { &t };
-        }
-        QCOMPARE(ObjectShadowDataRepository::instance()->m_objectToWrapperControlBlockMap.size(), 0);
-    }
-
     void testBasics()
     {
-        Test t;
-        t.m_children = QVector<Test *> { new Test {1, 2, &t}, new Test {3, 4, &t} };
-        ObjectHandle<Test> w { &t };
+        QObjectTestObject t;
+        t.m_children = QVector<QObjectTestObject *> { new QObjectTestObject {1, 2, &t}, new QObjectTestObject {3, 4, &t} };
+        ObjectHandle<QObjectTestObject> w { &t };
         //     error<decltype(w->children())>();
 
-        QCOMPARE(w->x(), t.xx());
-        QCOMPARE(w->y(), t.yy());
+
+        QCOMPARE(w->x(), t.x());
+        QCOMPARE(w->y(), t.y());
         QCOMPARE(w->str(), t.str());
         QCOMPARE(w->halloDu(), QStringLiteral("Hello, you."));
-        QCOMPARE(w->t()->active(), t.m_t->isActive());
+        QCOMPARE(w->t()->isActive(), t.t->isActive());
 
         t.setXX(16);
         t.setYY(20);
 
-        QCOMPARE(w->x(), t.xx());
-        QCOMPARE(w->y(), t.yy());
+        QCOMPARE(w->x(), t.x());
+        QCOMPARE(w->y(), t.y());
         QCOMPARE(w->str(), t.str());
         QCOMPARE(w->halloDu(), QStringLiteral("Hello, you."));
-        QCOMPARE(w->t()->active(), t.m_t->isActive());
+        QCOMPARE(w->t()->isActive(), t.t->isActive());
 
-        static_assert(std::is_same<typename decltype(w->children())::value_type, WeakObjectHandle<Test>>::value,
+        static_assert(std::is_same<decltype(w->t()), ObjectHandle<QTimer>>::value,
+                      "Something broke with the wrapping of objects into ObjectHandles...");
+        static_assert(std::is_same<typename decltype(w->children())::value_type, ObjectHandle<QObjectTestObject >>::value,
                       "Something broke with the wrapping of object lists into lists of ObjectHandles...");
 
         for (auto x : w->children()) {
             QCOMPARE(x->parent()->m_control, w->m_control);
-            QCOMPARE(x->x(), x.object()->xx());
-            QCOMPARE(x->y(), x.object()->yy());
+            QCOMPARE(x->x(), x.object()->x());
+            QCOMPARE(x->y(), x.object()->y());
             QCOMPARE(x->str(), x.object()->str());
             QCOMPARE(x->halloDu(), QStringLiteral("Hello, you."));
-            QCOMPARE(x->t()->active(), x.object()->m_t->isActive());
+            QCOMPARE(x->t()->isActive(), x.object()->t->isActive());
         }
     }
 
-    void testThreadBoundaries()
+    void testCleanup()
     {
-//         auto task = std::unique_ptr<Worker>(new Worker());
-//         task->setAutoDelete(false);
-//         QThreadPool::globalInstance()->start(task.get());
-
-        ObjectShadowDataRepository::instance()->m_objectToWrapperControlBlockMap.clear(); // FIXME this should not be necessary!
-        QThread workerThread;
-        workerThread.start();
-        Test t;
-        t.m_children = QVector<Test *> { new Test {1, 2, &t}, new Test {3, 4, &t} };
-        t.moveToThread(&workerThread);
-
-        ObjectHandle<Test> w { &t };
-        //     error<decltype(w->children())>();
-
-        QCOMPARE(w->x(), t.xx());
-        QCOMPARE(w->y(), t.yy());
-        QCOMPARE(w->str(), t.str());
-        QCOMPARE(w->halloDu(), QStringLiteral("Hello, you."));
-        QCOMPARE(w->t()->active(), t.m_t->isActive());
-
-        t.setXX(16);
-        t.setYY(20);
-
-        QCOMPARE(w->x(), t.xx());
-        QCOMPARE(w->y(), t.yy());
-        QCOMPARE(w->str(), t.str());
-        QCOMPARE(w->halloDu(), QStringLiteral("Hello, you."));
-        QCOMPARE(w->t()->active(), t.m_t->isActive());
-
-        static_assert(std::is_same<typename decltype(w->children())::value_type, WeakObjectHandle<Test>>::value,
-                      "Something broke with the wrapping of object lists into lists of ObjectHandles...");
-
-        for (auto x : w->children()) {
-            QCOMPARE(x->parent()->m_control, w->m_control);
-            QCOMPARE(x->x(), x.object()->xx());
-            QCOMPARE(x->y(), x.object()->yy());
-            QCOMPARE(x->str(), x.object()->str());
-            QCOMPARE(x->halloDu(), QStringLiteral("Hello, you."));
-            QCOMPARE(x->t()->active(), x.object()->m_t->isActive());
+        ObjectShadowDataRepository::instance()->m_objectToWrapperControlBlockMap.clear();
+        {
+            QObjectTestObject t;
+            t.m_children = QVector<QObjectTestObject *> { new QObjectTestObject {1, 2, &t}, new QObjectTestObject {3, 4, &t} };
+            ObjectHandle<QObjectTestObject> w { &t };
+            QCOMPARE(ObjectShadowDataRepository::instance()->m_objectToWrapperControlBlockMap.size(), 6); // test object with two children, every test object has a qtimer-child.
         }
-
-        workerThread.quit();
-        workerThread.wait();
+        QCOMPARE(ObjectShadowDataRepository::instance()->m_objectToWrapperControlBlockMap.size(), 0);
     }
+
+// SKIP: This feature has been removed. It's now simply forbidden (and asserted) to create an ObjectHandle from the wrong thread.
+//     void testThreadBoundaries()
+//     {
+// //         auto task = std::unique_ptr<Worker>(new Worker());
+// //         task->setAutoDelete(false);
+// //         QThreadPool::globalInstance()->start(task.get());
+//
+//         ObjectShadowDataRepository::instance()->m_objectToWrapperControlBlockMap.clear(); // FIXME this should not be necessary!
+//         QThread workerThread;
+//         workerThread.start();
+//         QObjectTestObject t;
+//         t.m_children = QVector<QObjectTestObject *> { new QObjectTestObject {1, 2, &t}, new QObjectTestObject {3, 4, &t} };
+//         t.moveToThread(&workerThread);
+//
+//         ObjectHandle<QObjectTestObject> w { &t };
+//         //     error<decltype(w->children())>();
+//
+//         QCOMPARE(w->x(), t.x());
+//         QCOMPARE(w->y(), t.y());
+//         QCOMPARE(w->str(), t.str());
+//         QCOMPARE(w->halloDu(), QStringLiteral("Hello, you."));
+//         QCOMPARE(w->t()->isActive(), t.t->isActive());
+//
+//         t.setXX(16);
+//         t.setYY(20);
+//
+//         QCOMPARE(w->x(), t.x());
+//         QCOMPARE(w->y(), t.y());
+//         QCOMPARE(w->str(), t.str());
+//         QCOMPARE(w->halloDu(), QStringLiteral("Hello, you."));
+//         QCOMPARE(w->t()->isActive(), t.t->isActive());
+//
+//         static_assert(std::is_same<typename decltype(w->children())::value_type, ObjectHandle<QObjectTestObject >>::value,
+//                       "Something broke with the wrapping of object lists into lists of ObjectHandles...");
+//
+//         for (auto x : w->children()) {
+//             QCOMPARE(x->parent()->m_control, w->m_control);
+//             QCOMPARE(x->x(), x.object()->x());
+//             QCOMPARE(x->y(), x.object()->y());
+//             QCOMPARE(x->str(), x.object()->str());
+//             QCOMPARE(x->halloDu(), QStringLiteral("Hello, you."));
+//             QCOMPARE(x->t()->isActive(), x.object()->t->isActive());
+//         }
+//
+//         workerThread.quit();
+//         workerThread.wait();
+//     }
 
     void testSelfReference()
     {
-        ObjectShadowDataRepository::instance()->m_objectToWrapperControlBlockMap.clear(); // FIXME this should not be necessary!
-        LinkedList ll { 5, new LinkedList(6) };
-        ObjectHandle<LinkedList> l { &ll };
+        ObjectShadowDataRepository::instance()->m_objectToWrapperControlBlockMap.clear();
+        {
+            LinkedList ll { 5, new LinkedList(6) };
+            ObjectHandle<LinkedList> l { &ll };
 
-        QVERIFY(l->object);
-        QVERIFY(l->m_control);
-        QVERIFY(ll.next()->prev());
-        QVERIFY(l->next()->m_control != l->m_control);
-        QVERIFY(l->next()->object);
-        QVERIFY(l->next()->prev()->object);
-        QCOMPARE(l->next()->prev()->m_control, l->m_control);
-        QCOMPARE(l->next()->i(), ll.next()->i());
-        QCOMPARE(l->next()->prev()->i(), ll.i());
-        QCOMPARE(l->next()->prev()->next()->i(), ll.next()->i());
-        QCOMPARE(l->next()->prev()->next()->prev()->i(), ll.i());
-        QCOMPARE(l->next()->prev()->next()->prev()->next()->i(), ll.next()->i());
+            QCOMPARE(ObjectShadowDataRepository::instance()->m_objectToWrapperControlBlockMap.size(), 2);
+
+            QVERIFY(l->object);
+            QVERIFY(l->m_control);
+            QVERIFY(ll.next()->prev());
+            QVERIFY(l->next()->m_control != l->m_control);
+            QVERIFY(l->next()->object);
+            QVERIFY(l->next()->prev()->object);
+            QCOMPARE(l->next()->prev()->m_control, l->m_control);
+            QCOMPARE(l->next()->i(), ll.next()->i());
+            QCOMPARE(l->next()->prev()->i(), ll.i());
+            QCOMPARE(l->next()->prev()->next()->i(), ll.next()->i());
+            QCOMPARE(l->next()->prev()->next()->prev()->i(), ll.i());
+            QCOMPARE(l->next()->prev()->next()->prev()->next()->i(), ll.next()->i());
+        }
+        QCOMPARE(ObjectShadowDataRepository::instance()->m_objectToWrapperControlBlockMap.size(), 0);
     }
 
     void testMoveHandle()
     {
-        Test t;
-        auto wptr = new ObjectHandle<Test> { &t };
-        ObjectHandle<Test> w = *wptr; // copy
+        QObjectTestObject t;
+        auto wptr = new ObjectHandle<QObjectTestObject> { &t };
+        ObjectHandle<QObjectTestObject> w = *wptr; // copy
         delete wptr;
 
-        QCOMPARE(w->x(), t.xx());
-        QCOMPARE(w->y(), t.yy());
+        QCOMPARE(w->x(), t.x());
+        QCOMPARE(w->y(), t.y());
         QCOMPARE(w->str(), t.str());
         QCOMPARE(w->halloDu(), QStringLiteral("Hello, you."));
-        QCOMPARE(w->t()->active(), t.m_t->isActive());
+        QCOMPARE(w->t()->isActive(), t.t->isActive());
 
         t.setXX(16);
         t.setYY(20);
 
-        QCOMPARE(w->x(), t.xx());
-        QCOMPARE(w->y(), t.yy());
+        QCOMPARE(w->x(), t.x());
+        QCOMPARE(w->y(), t.y());
         QCOMPARE(w->str(), t.str());
         QCOMPARE(w->halloDu(), QStringLiteral("Hello, you."));
-        QCOMPARE(w->t()->active(), t.m_t->isActive());
+        QCOMPARE(w->t()->isActive(), t.t->isActive());
+    }
+
+    void testNonQObject()
+    {
+        SimpleNonQObjectTestObject t {1, 2};
+        ObjectHandle<SimpleNonQObjectTestObject> w { &t };
+
+        QCOMPARE(w->x(), t.x());
+        QCOMPARE(w->y(), t.y);
+
+        t.setX(16);
+        t.y = 20;
+
+        w.refresh();
+
+        QCOMPARE(w->x(), t.x());
+        QCOMPARE(w->y(), t.y);
+    }
+
+    void testCachingDisabled()
+    {
+        DisabledCachingTestObject t;
+        ObjectHandle<DisabledCachingTestObject> w { &t };
+
+        QCOMPARE(t.m_callCount, 0);
+        QCOMPARE(w->x(), 42);
+        QCOMPARE(t.m_callCount, 1);
+
+        t.m_x = 21;
+        QCOMPARE(w->x(), 21);
+        QCOMPARE(t.m_callCount, 2);
+    }
+
+    void testMetaObject()
+    {
+        SimpleNonQObjectTestObject t {1, 2};
+        ObjectHandle<SimpleNonQObjectTestObject> w { &t };
+        auto mo = ObjectHandle<SimpleNonQObjectTestObject>::staticMetaObject();
+
+        QCOMPARE(mo->className(), QStringLiteral("SimpleNonQObjectTestObject"));
+        QCOMPARE(mo->propertyCount(), 2);
+        QCOMPARE(mo->propertyAt(0)->name(), "x");
+        QCOMPARE(mo->propertyAt(0)->typeName(), "int");
+        QCOMPARE(mo->propertyAt(0)->value(&*w), 1); // FIXME Fix the getter-API for accessing values through ObjectHandle-MetaObjects
+        QCOMPARE(mo->propertyAt(1)->name(), "y");
+        QCOMPARE(mo->propertyAt(1)->typeName(), "int");
+        QCOMPARE(mo->propertyAt(1)->value(&*w), 2);
+
+        t.setX(16);
+        t.y = 20;
+
+        QCOMPARE(mo->propertyAt(0)->value(&*w), 1);
+        QCOMPARE(mo->propertyAt(1)->value(&*w), 2);
+        w.refresh();
+        QCOMPARE(mo->propertyAt(0)->value(&*w), 16);
+        QCOMPARE(mo->propertyAt(1)->value(&*w), 20);
+
     }
 };
 
 }
+
 
 QTEST_MAIN(GammaRay::ObjectWrapperTest)
 

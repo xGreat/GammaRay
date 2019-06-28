@@ -40,9 +40,10 @@
 #include <QSemaphore>
 #include <QThread>
 
-#include <future>
+#include <core/metaobject.h>
+#include <core/metaproperty.h>
 
-
+#include <utility>
 #include <future>
 #include <tuple>
 #include <memory>
@@ -59,6 +60,31 @@ template<typename T> class error;
 template<int i> class err;
 
 
+template<typename T1, typename T2>
+typename std::enable_if<std::is_same<T1, T2>::value, T1*>::type noop(T1 *t1) { return t1; }
+template<typename T1, typename T2>
+typename std::enable_if<std::is_same<T1, T2>::value, const T1*>::type noop(const T1 *t1) { return t1; }
+
+/**
+ * May only be used in cases, where non-constexpr if would still produce valid code
+ */
+#define IF_CONSTEXPR if
+
+
+enum ObjectWrapperFlag {
+    NoFlags = 0,
+    Getter = 1,
+    NonConstGetter = 2,
+    MemberVar = 4,
+    DptrGetter = 8,
+    DptrMember = 16,
+    CustomCommand = 32,
+
+    QProp = 128,
+    OwningPointer = 256,
+    NonOwningPointer = 512
+};
+
 
 /**
  * Adds the inline definition of a getter function with the name @p FieldName,
@@ -66,13 +92,70 @@ template<int i> class err;
  * m_control->dataStorage.
  * This is internal for use in other macros.
  */
-#define DEFINE_GETTER(FieldName, StorageIndex, Command)                                                                                 \
-decltype(wrap(std::declval<value_type>().Command)) FieldName() const                                                                    \
-{                                                                                                                                       \
-    m_control->semaphore.acquire();                                                                                                     \
-    QSemaphoreReleaser releaser { &m_control->semaphore };                                                                              \
-    return std::get< StorageIndex >(m_control->dataStorage);                                                                            \
-}                                                                                                                                       \
+#define DEFINE_Getter(FieldName, StorageIndex, Flags) \
+decltype(fetch_##FieldName<Flags>(static_cast<value_type*>(nullptr))) FieldName() const \
+{ \
+    m_control->semaphore.acquire(); \
+    QSemaphoreReleaser releaser { &m_control->semaphore }; \
+ \
+    IF_CONSTEXPR (cachingDisabled<ThisClass_t>::value) { \
+        return fetch_##FieldName<Flags>(m_control->object); \
+    } else { \
+        return std::get< StorageIndex >(m_control->dataStorage); \
+    } \
+} \
+
+
+
+/**
+ * Wraps the getter command in a non-caching getter function.
+ * This is internal for use in other macros.
+ */
+#define DEFINE_FETCH_FUNCTION_PROP(FieldName) \
+template<int Flags, typename T = value_type, typename std::enable_if<(Flags & DptrGetter) != 0>::type* = nullptr> /*FIXME T must be the private class! */ \
+static auto fetch_##FieldName(const value_type *object) \
+-> decltype(wrap<Flags>(std::declval<T>().FieldName())) \
+{ \
+    return wrap<Flags>(T::get(object)->FieldName()); \
+} \
+template<int Flags, typename T = value_type, typename std::enable_if<(Flags & DptrMember) != 0>::type* = nullptr> /*FIXME T must be the private class! */ \
+static auto fetch_##FieldName(const value_type *object) \
+-> decltype(wrap<Flags>(std::declval<T>().FieldName)) \
+{ \
+    return wrap<Flags>(T::get(object)->FieldName); \
+} \
+template<int Flags, typename T = value_type, typename std::enable_if<(Flags & Getter) != 0>::type* = nullptr> \
+static auto fetch_##FieldName(const T *object) \
+-> decltype(wrap<Flags>(std::declval<T>().FieldName())) \
+{ \
+    return wrap<Flags>(noop<T, value_type>(object)->FieldName()); \
+} \
+template<int Flags, typename T = value_type, typename std::enable_if<(Flags & NonConstGetter) != 0>::type* = nullptr> \
+static auto fetch_##FieldName(T *object) \
+-> decltype(wrap<Flags>(std::declval<T>().FieldName())) \
+{ \
+    return wrap<Flags>(noop<T, value_type>(object)->FieldName()); \
+} \
+template<int Flags, typename T = value_type, typename std::enable_if<(Flags & MemberVar) != 0>::type* = nullptr> \
+static auto fetch_##FieldName(const T *object) \
+-> decltype(wrap<Flags>(std::declval<T>().FieldName)) \
+{ \
+    return wrap<Flags>(noop<T, value_type>(object)->FieldName); \
+} \
+
+/**
+ * Wraps the getter command in a non-caching getter function.
+ * This is internal for use in other macros.
+ */
+#define DEFINE_FETCH_FUNCTION_LAMBDA(FieldName, Lambda) \
+static constexpr auto FieldName##_Lambda = Lambda;\
+template<int Flags, typename T = value_type> \
+static auto fetch_##FieldName(const T *object) \
+-> decltype(wrap<Flags>(FieldName##_Lambda(std::declval<T*>()))) \
+{ \
+    return wrap<Flags>(FieldName##_Lambda(object)); \
+} \
+
 
 /**
  * Adds the inline definition of a method, which holds state using overloading
@@ -105,12 +188,17 @@ struct tuple_append<std::tuple<TupleArgs_t...>, T> {
 template<typename Tuple_t, typename T>
 using tuple_append_t = typename tuple_append<Tuple_t, T>::type;
 
-#define STATE_APPEND(MethodName, Counter, AppendedType, StateExpr)                                                                                   \
-friend auto MethodName(ThisClass_t *self, w_number<Counter> w_counter)                                                                  \
--> tuple_append_t<decltype(MethodName(self, w_counter.prev())), AppendedType>                                                    \
-{                                                                                                                                       \
-    return std::tuple_cat(MethodName(self, w_counter.prev()), std::make_tuple(StateExpr));                                              \
+#define STATE_APPEND(MethodName, Counter, AppendedType, StateExpr) \
+friend auto MethodName(ThisClass_t *self, w_number<Counter> w_counter) \
+-> tuple_append_t<decltype(MethodName(self, w_counter.prev())), AppendedType> \
+{ \
+    return std::tuple_cat(MethodName(self, w_counter.prev()), std::make_tuple(StateExpr)); \
 }
+
+#define ADD_TO_METAOBJECT(FieldName, FieldType, Flags) \
+STATE_APPEND(w_metadata, W_COUNTER_##FieldName, MetaProperty*, \
+    GammaRay::MetaPropertyFactory::makeProperty(#FieldName, &ThisClass_t::FieldName) \
+) \
 
 /**
  * Defines a constexpr variable that fetches the current value of the count
@@ -126,11 +214,21 @@ friend auto MethodName(ThisClass_t *self, w_number<Counter> w_counter)          
  * DEFINE_COUNTER. Use DEFINE_COUNTER to define a constexpr variable holding the
  * current count + 1. Use STATE_APPEND to make it the new current count.
  *
- * This is meant for internal use in other MACROS only.
+ * This is meant for internal use in other macros only.
  */
-#define DEFINE_COUNTER(CounterName, CounterMethod)                                                                                      \
-static constexpr int CounterName =                                                                                                      \
-std::tuple_size<decltype(CounterMethod(static_cast<ThisClass_t*>(nullptr), w_number<255>{}))>::value + 1;                               \
+#define DEFINE_COUNTER(CounterName, CounterMethod) \
+static constexpr int CounterName = \
+std::tuple_size<decltype(CounterMethod(static_cast<ThisClass_t*>(nullptr), w_number<255>{}))>::value + 1; \
+
+
+#define CONNECT_TO_UPDATES(FieldName, Flags) \
+friend void w_connectToUpdates(ThisClass_t *self, w_number<W_COUNTER_##FieldName>) \
+{ \
+    connectToUpdates< W_COUNTER_##FieldName - 1, Flags >(self, &ThisClass_t::fetch_##FieldName<Flags>, #FieldName); \
+    w_connectToUpdates(self, w_number< W_COUNTER_##FieldName - 1 >{}); \
+} \
+
+
 
 /**
  * Adds a member field to the object wrapper. The data will be accessible
@@ -141,22 +239,49 @@ std::tuple_size<decltype(CounterMethod(static_cast<ThisClass_t*>(nullptr), w_num
  * available to the wrapper, by writing `MEMBER(x, x())`. Later, use wrapper.x()
  * to access it.
  */
-#define MEMBER(FieldName, Command)                                                                                                      \
-DEFINE_COUNTER(W_COUNTER_##FieldName, w_data)                                                                                           \
-STATE_APPEND(w_data, W_COUNTER_##FieldName, decltype(wrap(std::declval<value_type>().Command)), wrap(self->object->Command))                                                               \
-DEFINE_GETTER(FieldName, W_COUNTER_##FieldName - 1, Command)                                                                            \
+#define MEMBER(FieldName, Command, Flags) \
+DEFINE_COUNTER(W_COUNTER_##FieldName, w_data) \
+DEFINE_FETCH_FUNCTION(FieldName, Command, Flags) \
+STATE_APPEND(w_data, W_COUNTER_##FieldName, decltype(fetch_##FieldName<Flags>(static_cast<value_type*>(nullptr))), fetch_##FieldName<Flags>(self->object)) \
+DEFINE_Getter(FieldName, W_COUNTER_##FieldName - 1, Flags) \
+ADD_TO_METAOBJECT(FieldName, decltype(fetch_##FieldName<Flags>(static_cast<value_type*>(nullptr))), Flags) \
+
 
 /**
- * The same as MEMBER, but doesn't prepend `obj->` to the command. Instead
- * you need to use `self->object` in your command. This is useful if you
- * want to add a data field to the wrapper that corresponds to no getter
- * in the original class, e.g.
- * `MEMBER2(name, Utils::getCanonicalName(self->object))`.
+ * Adds a member field to the object wrapper. The data will be accessible
+ * through a getter in the wrapper, named as \p FieldName and will contain the
+ * result of a call to `obj->\p Command`.
+ *
+ * Example: If you used obj->x() before to access some data, you can make that
+ * available to the wrapper, by writing `MEMBER(x, x())`. Later, use wrapper.x()
+ * to access it.
  */
-#define MEMBER2(FieldName, Command)                                                                                                     \
-DEFINE_COUNTER(W_COUNTER_##FieldName, w_data)                                                                                           \
-STATE_APPEND(w_data, W_COUNTER_##FieldName, decltype(wrap(Command)), wrap(Command))                                                                             \
-DEFINE_GETTER(FieldName, W_COUNTER_##FieldName - 1, Command)                                                                            \
+#define PROP(FieldName, Flags) \
+DEFINE_COUNTER(W_COUNTER_##FieldName, w_data) \
+DEFINE_FETCH_FUNCTION_PROP(FieldName) \
+STATE_APPEND(w_data, W_COUNTER_##FieldName, decltype(fetch_##FieldName<Flags>(static_cast<value_type*>(nullptr))), fetch_##FieldName<Flags>(self->object)) \
+DEFINE_Getter(FieldName, W_COUNTER_##FieldName - 1, Flags) \
+ADD_TO_METAOBJECT(FieldName, decltype(fetch_##FieldName<Flags>(static_cast<value_type*>(nullptr))), Flags) \
+CONNECT_TO_UPDATES(FieldName, Flags) \
+
+/**
+ * Adds a member field to the object wrapper. The data will be accessible
+ * through a getter in the wrapper, named as \p FieldName and will contain the
+ * result of a call to `obj->\p Command`.
+ *
+ * Example: If you used obj->x() before to access some data, you can make that
+ * available to the wrapper, by writing `MEMBER(x, x())`. Later, use wrapper.x()
+ * to access it.
+ */
+#define LAMBDA_PROP(FieldName, Lambda, Flags) \
+DEFINE_COUNTER(W_COUNTER_##FieldName, w_data) \
+DEFINE_FETCH_FUNCTION_LAMBDA(FieldName, Lambda) \
+STATE_APPEND(w_data, W_COUNTER_##FieldName, decltype(fetch_##FieldName<Flags>(static_cast<value_type*>(nullptr))), fetch_##FieldName<Flags>(self->object)) \
+DEFINE_Getter(FieldName, W_COUNTER_##FieldName - 1, Flags) \
+ADD_TO_METAOBJECT(FieldName, decltype(fetch_##FieldName<Flags>(static_cast<value_type*>(nullptr))), Flags) \
+
+
+
 
 /**
  * Adds a member field for a Q_PROPERTY. As with usual getters, the data will be
@@ -168,14 +293,14 @@ DEFINE_GETTER(FieldName, W_COUNTER_##FieldName - 1, Command)                    
  * \sa MEMBER
  * \sa MEMBER_WITH_NOTIFY
  */
-#define QPROP_MEMBER(FieldName, Command)                                                                                                \
-MEMBER(FieldName, Command)                                                                                                              \
-friend void w_connectToUpdates(ThisClass_t *self, w_number<W_COUNTER_##FieldName>)                                                      \
-{                                                                                                                                       \
-                                                                                                                                        \
-    connectToUpdates< W_COUNTER_##FieldName - 1 >(self, [](value_type *obj) { return wrap(obj->Command); }, #FieldName);                      \
-    w_connectToUpdates(self, w_number< W_COUNTER_##FieldName - 1 >{});                                                                  \
-}                                                                                                                                       \
+#define QProp_MEMBER(FieldName, Command) \
+MEMBER(FieldName, Command, Getter) \
+friend void w_connectToUpdates(ThisClass_t *self, w_number<W_COUNTER_##FieldName>) \
+{ \
+ \
+    connectToUpdates< W_COUNTER_##FieldName - 1 >(self, [](value_type *obj) { return wrap<0>(obj->Command()); }, #FieldName); \
+    w_connectToUpdates(self, w_number< W_COUNTER_##FieldName - 1 >{}); \
+} \
 
 /**
  * Adds a member field to the object wrapper, which can update itself by
@@ -187,98 +312,99 @@ friend void w_connectToUpdates(ThisClass_t *self, w_number<W_COUNTER_##FieldName
  *
  * \sa MEMBER
  */
-#define MEMBER_WITH_NOTIFY(FieldName, Command, NotifySignal)                                                                            \
-MEMBER(FieldName, Command)                                                                                                              \
-friend void w_connectToUpdates(ThisClass_t *self, w_number<W_COUNTER_##FieldName>)                                                      \
-{                                                                                                                                       \
-    connectToUpdates< W_COUNTER_##FieldName - 1 >(self, [](value_type *obj) { return wrap(obj->Command); }, &value_type::NotifySignal);       \
-    w_connectToUpdates(self, w_number< W_COUNTER_##FieldName - 1 >{});                                                                  \
-}                                                                                                                                       \
-
-/**
- * Adds a member field for data which is only available through the private
- * object. It uses `PrivateClass::get(obj)->Command` to get the data.
- */
-#define DPTR_MEMBER(PrivateClass, FieldName, Command)                                                                                   \
-DEFINE_COUNTER(W_COUNTER_##FieldName, w_data)                                                                                           \
-STATE_APPEND(w_data, W_COUNTER_##FieldName, decltype(wrap(std::declval<PrivateClass>().Command)), wrap(PrivateClass::get(self->object)->Command))                                             \
-DEFINE_GETTER(FieldName, W_COUNTER_##FieldName - 1, Command)                                                                            \
-
+#define MEMBER_WITH_NOTIFY(FieldName, Command, NotifySignal) \
+MEMBER(FieldName, Command, Getter) \
+friend void w_connectToUpdates(ThisClass_t *self, w_number<W_COUNTER_##FieldName>) \
+{ \
+    connectToUpdates< W_COUNTER_##FieldName - 1 >(self, [](value_type *obj) { return wrap<0>(obj->Command()); }, &value_type::NotifySignal); \
+    w_connectToUpdates(self, w_number< W_COUNTER_##FieldName - 1 >{}); \
+} \
 
 /**
  * Adds a member field for data which is only available through the private
  * object and can be updated through a notifySignal. The notify signal is
  * assumed to be a signal of the object, not the private object.
  *
- * \sa DPTR_MEMBER
+ * \sa DptrMember
  * \sa MEMBER_WITH_NOTIFY
  */
-#define DPTR_MEMBER_WITH_NOTIFY(PrivateClass, FieldName, Command, NotifySignal)                                                         \
-DEFINE_COUNTER(W_COUNTER_##FieldName, w_data)                                                                                           \
-STATE_APPEND(w_data, W_COUNTER_##FieldName, decltype(wrap(std::declval<PrivateClass>().Command)), wrap(PrivateClass::get(self->object)->Command))                                             \
-DEFINE_GETTER(FieldName, W_COUNTER_##FieldName - 1, Command)                                                                            \
-friend void w_connectToUpdates(ThisClass_t *self, w_number<W_COUNTER_##FieldName>)                                                      \
-{                                                                                                                                       \
-    connectToUpdates< W_COUNTER_##FieldName - 1 >(self, [](value_type *obj) { return wrap(PrivateClass::get(obj)->Command); },                \
-                                                  &value_type::NotifySignal);                                                           \
-    w_connectToUpdates(self, w_number< W_COUNTER_##FieldName - 1 >{});                                                                  \
-}                                                                                                                                       \
+#define DptrMember_WITH_NOTIFY(PrivateClass, FieldName, Command, NotifySignal) \
+DEFINE_COUNTER(W_COUNTER_##FieldName, w_data) \
+DEFINE_FETCH_FUNCTION(FieldName, Command) \
+STATE_APPEND(w_data, W_COUNTER_##FieldName, decltype(fetch_##FieldName<Flags>(static_cast<value_type*>(nullptr))), fetch_##FieldName<Flags>(self->object)) \
+DEFINE_Getter(FieldName, W_COUNTER_##FieldName - 1,  0) \
+friend void w_connectToUpdates(ThisClass_t *self, w_number<W_COUNTER_##FieldName>) \
+{ \
+    connectToUpdates< W_COUNTER_##FieldName - 1 >(self, [](value_type *obj) { return wrap<0>(PrivateClass::get(obj)->Command); }, \
+                                                  &value_type::NotifySignal); \
+    w_connectToUpdates(self, w_number< W_COUNTER_##FieldName - 1 >{}); \
+} \
 
 
-#define DIRECT_ACCESS_METHOD(MethodName)                                                                                                \
-template<typename ...Args> auto MethodName(Args &&...args) -> decltype(object->MethodName(args...))                                     \
-{                                                                                                                                       \
-    return object->MethodName(args...);                                                                                                 \
-}                                                                                                                                       \
+
+#define DIRECT_ACCESS_METHOD(MethodName) \
+template<typename ...Args> auto MethodName(Args &&...args) -> decltype(object->MethodName(args...)) \
+{ \
+    return object->MethodName(args...); \
+} \
 
 
-#define BLOCKING_ASYNC_METHOD(MethodName)                                                                                               \
-template<typename ...Args> auto MethodName(Args &&...args) -> decltype(object->MethodName(args...))                                     \
-{                                                                                                                                       \
-    return call(object, &value_type::MethodName, args...).get();                                                                        \
-}                                                                                                                                       \
+#define BLOCKING_ASYNC_METHOD(MethodName) \
+template<typename ...Args> auto MethodName(Args &&...args) -> decltype(object->MethodName(args...)) \
+{ \
+    return call(object, &value_type::MethodName, args...).get(); \
+} \
 
-#define ASYNC_VOID_METHOD(MethodName)                                                                                                   \
-template<typename ...Args> void MethodName(Args &&...args)                                                                              \
-{                                                                                                                                       \
-    call(object, &value_type::MethodName, args...);                                                                                     \
-}                                                                                                                                       \
+#define ASYNC_VOID_METHOD(MethodName) \
+template<typename ...Args> void MethodName(Args &&...args) \
+{ \
+    call(object, &value_type::MethodName, args...); \
+} \
 
+#define DISABLE_CACHING using disableCaching_t = void;
 
-#define DECLARE_OBJECT_WRAPPER(Class, ...)                                                                                              \
-template<>                                                                                                                              \
-class ObjectWrapper<Class> : public GammaRay::ObjectWrapperBase                                                                         \
-{                                                                                                                                       \
-private:                                                                                                                                \
-    Class *object = nullptr;                                                                                                            \
-                                                                                                                                        \
-public:                                                                                                                                 \
-    using value_type = Class;                                                                                                           \
-    using ThisClass_t = ObjectWrapper<Class>;                                                                                           \
-    friend std::tuple<> w_data(ObjectWrapper<Class> *, w_number<0>) { return {}; }                                                      \
-    friend void w_connectToUpdates(ObjectWrapper<Class> *, w_number<0>) {}                                                              \
-                                                                                                                                        \
-    __VA_ARGS__;                                                                                                                        \
-                                                                                                                                        \
-    using ControlData = ControlBlock<Class, decltype( w_data(static_cast<ObjectWrapper<Class>*>(nullptr), w_number<255>()) )>;          \
-                                                                                                                                        \
-    explicit ObjectWrapper<Class>(Class *object)                                                                                        \
-    : object(object)                                                                                                                    \
-    {                                                                                                                                   \
-        initialize<ObjectWrapper<Class>>(this);                                                                                         \
-    }                                                                                                                                   \
-    explicit ObjectWrapper<Class>(std::shared_ptr<ControlData> controlBlock)                                                            \
-        : object(controlBlock->object)                                                                                                  \
-        , m_control(std::move(controlBlock))                                                                                            \
-    {}                                                                                                                                  \
-    explicit ObjectWrapper<Class>() = default;                                                                                          \
-                                                                                                                                        \
-private:                                                                                                                                \
-    friend class ObjectWrapperBase;                                                                                                     \
-    friend class ObjectWrapperTest;                                                                                                     \
-    friend class ObjectHandle<Class>;                                                                                                   \
-    std::shared_ptr<ControlData> m_control;                                                                                             \
-};                                                                                                                                      \
+#define DECLARE_OBJECT_WRAPPER(Class, ...) \
+template<> \
+class GammaRay::ObjectWrapper<Class> : public GammaRay::ObjectWrapperBase \
+{ \
+private: \
+    Class *object = nullptr; \
+ \
+public: \
+    using value_type = Class; \
+    using ThisClass_t = ObjectWrapper<Class>; \
+    friend std::tuple<> w_data(ObjectWrapper<Class> *, w_number<0>) { return {}; } \
+    friend std::tuple<> w_metadata(ObjectWrapper<Class> *, w_number<0>) { return {}; } \
+    friend void w_connectToUpdates(ObjectWrapper<Class> *, w_number<0>) {} \
+ \
+    __VA_ARGS__; \
+ \
+    using ControlData = ControlBlock<Class, decltype( w_data(static_cast<ObjectWrapper<Class>*>(nullptr), w_number<255>()) )>; \
+    static MetaObject *staticMetaObject() { \
+        static MetaObjectImpl<Class> mo { QStringLiteral(#Class), w_metadata(static_cast<ObjectWrapper<Class>*>(nullptr), w_number<255>()) }; \
+        return &mo; \
+    } \
+ \
+    explicit ObjectWrapper<Class>(Class *object) \
+    : object(object) \
+    { \
+        initialize<ObjectWrapper<Class>>(this); \
+    } \
+    explicit ObjectWrapper<Class>(std::shared_ptr<ControlData> controlBlock) \
+        : object(controlBlock->object) \
+        , m_control(std::move(controlBlock)) \
+    {} \
+    explicit ObjectWrapper<Class>() = default; \
+ \
+private: \
+    friend class ObjectWrapperBase; \
+    friend class ObjectWrapperTest; \
+    friend class ObjectHandle<Class>; \
+    std::shared_ptr<ControlData> m_control; \
+}; \
+Q_DECLARE_METATYPE(GammaRay::ObjectWrapper<Class>); \
+Q_DECLARE_METATYPE(GammaRay::ObjectHandle<Class>); \
+Q_DECLARE_METATYPE(GammaRay::WeakObjectHandle<Class>); \
 
 
 
@@ -292,12 +418,18 @@ template<int N> struct w_number : public w_number<N - 1> {
 // Specialize for 0 to break the recursion.
 template<> struct w_number<0> { static constexpr int value = 0; };
 
+template<typename T1, typename T2> using second_t = T2;
+
+
+template<typename T, typename Enable = void>
+struct cachingDisabled : public std::false_type {};
+template<typename T>
+struct cachingDisabled<T, typename T::disableCaching_t> : public std::true_type {};
+
 template<typename Class> class ObjectWrapper {
 public:
     using isDummyWrapper_t = void;
 };
-
-template<typename T1, typename T2> using second_t = T2;
 
 class ObjectWrapperBase
 {
@@ -318,13 +450,22 @@ protected:
     };
 
     template<typename Derived_t>
+    static constexpr bool cachingEnabled(Derived_t *self);
+
+    template<typename Derived_t>
     static void initialize(Derived_t *self);
 
-    template<int storageIndex, typename Derived_t, typename CommandFunc_t>
+    template<int storageIndex, int Flags, typename Derived_t, typename CommandFunc_t, typename std::enable_if<!(Flags & QProp)>::type* = nullptr>
+    static void connectToUpdates(Derived_t *self, CommandFunc_t command, const char* propertyName) {}
+
+    template<int storageIndex, int Flags, typename Derived_t, typename CommandFunc_t, typename std::enable_if<Flags & QProp>::type* = nullptr>
     static void connectToUpdates(Derived_t *self, CommandFunc_t command, const char* propertyName);
 
     template<int storageIndex, typename Derived_t, typename CommandFunc_t, typename SignalFunc_t>
     static void connectToUpdates(Derived_t *self, CommandFunc_t command, SignalFunc_t signal);
+
+    template<typename Class, typename ...Args_t>
+    static GammaRay::MetaObjectImpl<Class> makeStaticMetaObject(const QString &className, const std::tuple<Args_t...> &properties);
 
     friend class ObjectShadowDataRepository;
 };
@@ -352,6 +493,11 @@ public:
 
     template<typename Func, typename ...Args>
     auto call(Func &&f, Args &&...args) -> std::future<decltype(std::declval<T*>()->*f(args...))>;
+
+
+    static MetaObject *staticMetaObject();
+
+    void refresh();
 
 private:
     ObjectWrapper<T> m_objectWrapper;
@@ -395,7 +541,7 @@ private:
     explicit ObjectShadowDataRepository() = default;
     friend class Probe;
 
-    QHash<QObject*, std::weak_ptr<ObjectWrapperBase::ControlBlockBase>> m_objectToWrapperControlBlockMap;
+    QHash<void*, std::weak_ptr<ObjectWrapperBase::ControlBlockBase>> m_objectToWrapperControlBlockMap;
 
     friend class ObjectWrapperBase;
     friend class ObjectWrapperTest;
@@ -408,35 +554,54 @@ private:
 
 // === ObjectWrapperBase ===
 
+template<typename T>
+auto checkCorrectThread(T *obj) -> typename std::enable_if<!std::is_base_of<QObject, T>::value, bool>::type
+{
+    return true;
+}
+template<typename T>
+auto checkCorrectThread(T *obj) -> typename std::enable_if<std::is_base_of<QObject, T>::value, bool>::type
+{
+    return obj->thread() == QThread::currentThread();
+}
+template<typename T>
+auto checkValidObject(T *obj) -> typename std::enable_if<!std::is_base_of<QObject, T>::value, bool>::type
+{
+    return obj != nullptr;
+}
+template<typename T>
+auto checkValidObject(T *obj) -> typename std::enable_if<std::is_base_of<QObject, T>::value, bool>::type
+{
+    return Probe::instance()->isValidObject(obj);
+}
+
 
 template<typename Derived_t>
 void ObjectWrapperBase::initialize(Derived_t *self)
 {
-    if (!Probe::instance()->isValidObject(self->object)) {
+    if (!checkValidObject(self->object)) {
         return;
     }
     self->m_control = std::make_shared<typename Derived_t::ControlData>(self->object);
     std::weak_ptr<ObjectWrapperBase::ControlBlockBase> controlWeakPtr { std::static_pointer_cast<ObjectWrapperBase::ControlBlockBase>(self->m_control) };
     ObjectShadowDataRepository::instance()->m_objectToWrapperControlBlockMap.insert(self->object, controlWeakPtr );
 
-    auto fetchData = [self]() mutable {
-        QMutexLocker locker { Probe::objectLock() };
-        QSemaphoreReleaser releaser { self->m_control->semaphore }; // releases the first (and only) resource
-        self->m_control->dataStorage = w_data(self, w_number<255>());
-    };
+    Q_ASSERT_X(checkCorrectThread(self->object), "ObjectHandle", "ObjectHandles can only be created from the thread which the wrapped QObject belongs to.");
 
-//     self->m_control->connections.push_back(QObject::connect(self->object, &QObject::destroyed, &));
-    if (self->object->thread() == QThread::currentThread()) {
-        fetchData();
-    } else {
-        QMetaObject::invokeMethod(self->object, fetchData, Qt::QueuedConnection);
+    QSemaphoreReleaser releaser { self->m_control->semaphore }; // releases the first (and only) resource
+
+    IF_CONSTEXPR (!cachingDisabled<Derived_t>::value) {
+        QMutexLocker locker { Probe::objectLock() };
+        self->m_control->dataStorage = w_data(self, w_number<255>());
+
+        w_connectToUpdates(self, w_number<255>{});
     }
-    w_connectToUpdates(self, w_number<255>{});
 }
 
-template<int storageIndex, typename Derived_t, typename CommandFunc_t>
-void ObjectWrapperBase::connectToUpdates(Derived_t *self, CommandFunc_t command, const char* propertyName)
+template<int storageIndex, int Flags, typename Derived_t, typename CommandFunc_t, typename std::enable_if<Flags & QProp>::type* = nullptr>
+void ObjectWrapperBase::connectToUpdates(Derived_t *self, CommandFunc_t fetchFunction, const char* propertyName)
 {
+    static_assert(std::is_base_of<QObject, typename Derived_t::value_type>::value, "members with notify signals can only be defined for QObject-derived types.");
     auto mo = self->object->metaObject();
     auto prop = mo->property(mo->indexOfProperty(propertyName));
 
@@ -445,13 +610,13 @@ void ObjectWrapperBase::connectToUpdates(Derived_t *self, CommandFunc_t command,
     }
 
     auto controlPtr = std::weak_ptr<typename Derived_t::ControlData> {self->m_control};
-    auto f = [controlPtr, command]() {
+    auto f = [controlPtr, fetchFunction]() { // We may not capture self here, because the handle might be moved.
         std::cout << "Updating cache."<< storageIndex <<"\n";
         QMutexLocker locker { Probe::objectLock() };
         auto control = controlPtr.lock();
         control->semaphore.acquire();
         QSemaphoreReleaser releaser { control->semaphore };
-        std::get< storageIndex >(control->dataStorage) = command(control->object);
+        std::get< storageIndex >(control->dataStorage) = fetchFunction(control->object);
     };
 
     auto connection = QObjectPrivate::connect(self->object,
@@ -467,6 +632,7 @@ void ObjectWrapperBase::connectToUpdates(Derived_t *self, CommandFunc_t command,
 template<int storageIndex, typename Derived_t, typename CommandFunc_t, typename SignalFunc_t>
 void ObjectWrapperBase::connectToUpdates(Derived_t *self, CommandFunc_t command, SignalFunc_t signal)
 {
+    static_assert(std::is_base_of<QObject, typename Derived_t::value_type>::value, "members with notify signals can only be defined for QObject-derived types.");
     auto controlPtr = std::weak_ptr<typename Derived_t::ControlData> {self->m_control};
     auto f = [controlPtr, command]() {
         std::cout << "Updating cache."<< storageIndex <<"\n";
@@ -554,6 +720,19 @@ auto ObjectHandle<T>::call(Func &&f, Args &&...args) -> std::future<decltype(std
     return future;
 }
 
+template<typename T>
+void ObjectHandle<T>::refresh()
+{
+    m_objectWrapper.m_control->dataStorage = w_data(&m_objectWrapper, w_number<255>());
+}
+
+
+template<typename T>
+MetaObject *ObjectHandle<T>::staticMetaObject()
+{
+    return decltype(m_objectWrapper)::staticMetaObject();
+}
+
 // === WeakObjectHandle ===
 
 template<typename T>
@@ -628,12 +807,13 @@ ObjectHandle<Class> ObjectShadowDataRepository::handleForObject(Class *obj)
 template<typename Class>
 WeakObjectHandle<Class> ObjectShadowDataRepository::weakHandleForObject(Class *obj)
 {
+    if (!obj) {
+        return WeakObjectHandle<Class> {};
+    }
+
     auto self = instance();
 
-    if (!self->m_objectToWrapperControlBlockMap.contains(obj)) {
-        ObjectHandle<Class> handle { obj }; // will insert itself into the map
-        // FIXME: This is the only strong handle, i.e. control block will be deleted immediately...
-    }
+    Q_ASSERT_X(self->m_objectToWrapperControlBlockMap.contains(obj), "weakHandleForObject", "Obtaining a weak handle requires a (strong) handle to already exist.");
 
     auto controlBasePtr = self->m_objectToWrapperControlBlockMap.value(obj).lock();
     std::weak_ptr<typename ObjectWrapper<Class>::ControlData> controlPtr =
@@ -665,26 +845,33 @@ ObjectWrapperBase::ControlBlock<Class, Data_t>::~ControlBlock()
     ObjectShadowDataRepository::instance()->m_objectToWrapperControlBlockMap.remove(object);
 }
 
+}
 
-template<typename T>
+
+template<int flags, typename T>
 auto wrap(T &&value) -> second_t<typename ObjectWrapper<T>::isDummyWrapper_t, T>
 {
     return std::forward<T>(value);
 }
-template<typename T>
-auto wrap(T *object) -> second_t<typename ObjectWrapper<T>::value_type, WeakObjectHandle<T>>
+template<int flags, typename T>
+auto wrap(T *object) -> second_t<typename ObjectWrapper<T>::value_type, typename std::enable_if<flags & NonOwningPointer, WeakObjectHandle<T>>::type>
 {
     return ObjectShadowDataRepository::weakHandleForObject(object);
 }
-template<typename T>
+template<int flags, typename T>
+auto wrap(T *object) -> second_t<typename ObjectWrapper<T>::value_type, typename std::enable_if<flags & OwningPointer, ObjectHandle<T>>::type>
+{
+    return ObjectShadowDataRepository::handleForObject(object);
+}
+template<int flags, typename T>
 auto wrap(const QList<T*> &list) -> second_t<typename ObjectWrapper<T>::value_type, QList<WeakObjectHandle<T>>>
 {
     QList<WeakObjectHandle<T>> handleList;
     std::transform(list.cBegin(), list.cEnd(), handleList.begin(), [](T *t) { return ObjectShadowDataRepository::weakHandleForObject(t); });
     return handleList;
 }
-template<typename T>
-auto wrap(QVector<T*> list) -> second_t<typename ObjectWrapper<T>::value_type, QVector<WeakObjectHandle<T>>>
+template<int flags, typename T>
+auto wrap(QVector<T*> list) -> second_t<typename ObjectWrapper<T>::value_type, typename std::enable_if<flags & NonOwningPointer, QVector<WeakObjectHandle<T>>>::type>
 {
     QVector<WeakObjectHandle<T>> handleList;
     handleList.reserve(list.size());
@@ -694,7 +881,16 @@ auto wrap(QVector<T*> list) -> second_t<typename ObjectWrapper<T>::value_type, Q
     //     std::transform(list.cbegin(), list.cend(), handleList.begin(), [](T *t) { return WeakObjectHandle<T> { t }; });
     return handleList;
 }
-
+template<int flags, typename T>
+auto wrap(QVector<T*> list) -> second_t<typename ObjectWrapper<T>::value_type, typename std::enable_if<flags & OwningPointer, QVector<ObjectHandle<T>>>::type>
+{
+    QVector<ObjectHandle<T>> handleList;
+    handleList.reserve(list.size());
+    for (T *t : qAsConst(list)) {
+        handleList.push_back(ObjectShadowDataRepository::handleForObject(t));
+    }
+    //     std::transform(list.cbegin(), list.cend(), handleList.begin(), [](T *t) { return WeakObjectHandle<T> { t }; });
+    return handleList;
 }
 
 
@@ -705,5 +901,7 @@ auto wrap(QVector<T*> list) -> second_t<typename ObjectWrapper<T>::value_type, Q
 
 // TODO: Revise shared_ptr-model: we'd actually need GC, because the handles reference each other.
 // TODO: Delete the handles when the QObject is destroyed => connect to destroyed-signal => maybe we don't actually need shared-pointers at all?
+
+// TODO: Look at Event-monitor, lazy-properties, look at Bindings und Signal-Slot connections
 
 #endif // GAMMARAY_OBJECTHANDLE_H
