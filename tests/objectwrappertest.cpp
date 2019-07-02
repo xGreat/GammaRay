@@ -199,11 +199,11 @@ DECLARE_OBJECT_WRAPPER(QObjectTestObject,
                        PROP(x, Getter | QProp)
                        PROP(y, Getter | QProp)
                        PROP(str, NonConstGetter)
-                       LAMBDA_PROP(halloDu, [](const QObjectTestObject *obj) { return obj->echo("Hello, you."); }, CustomCommand)
+                       CUSTOM_PROP(halloDu, object->echo("Hello, you."), CustomCommand)
                        PROP(t, MemberVar | OwningPointer)
                        PROP(children, Getter | OwningPointer)
                        PROP(parent, Getter | NonOwningPointer)
-                       LAMBDA_PROP(childrenCount, [](const QObjectTestObject *obj) { return getChildrenCount(obj); }, CustomCommand)
+                       CUSTOM_PROP(childrenCount, getChildrenCount(object), CustomCommand)
 )
 DECLARE_OBJECT_WRAPPER(LinkedList,
                        PROP(i, Getter)

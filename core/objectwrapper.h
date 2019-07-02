@@ -141,13 +141,12 @@ static auto fetch_##FieldName(const T *object) \
  * Wraps the getter command in a non-caching getter function.
  * This is internal for use in other macros.
  */
-#define DEFINE_FETCH_FUNCTION_LAMBDA(FieldName, Lambda) \
-static constexpr auto FieldName##_Lambda = Lambda;\
+#define DEFINE_FETCH_FUNCTION_CUSTOM_EXPRESSION(FieldName, Expr) \
 template<int Flags, typename T = value_type> \
 static auto fetch_##FieldName(const T *object) \
--> decltype(wrap<Flags>(FieldName##_Lambda(std::declval<T*>()))) \
+-> decltype(wrap<Flags>(Expr)) \
 { \
-    return wrap<Flags>(FieldName##_Lambda(object)); \
+    return wrap<Flags>(Expr); \
 } \
 
 
@@ -249,9 +248,9 @@ CONNECT_TO_UPDATES(FieldName, Flags) \
  * available to the wrapper, by writing `MEMBER(x, x())`. Later, use wrapper.x()
  * to access it.
  */
-#define LAMBDA_PROP(FieldName, Lambda, Flags) \
+#define CUSTOM_PROP(FieldName, Expression, Flags) \
 DEFINE_COUNTER(W_COUNTER_##FieldName, w_data) \
-DEFINE_FETCH_FUNCTION_LAMBDA(FieldName, Lambda) \
+DEFINE_FETCH_FUNCTION_CUSTOM_EXPRESSION(FieldName, Expression) \
 STATE_APPEND(w_data, W_COUNTER_##FieldName, decltype(fetch_##FieldName<Flags>(static_cast<value_type*>(nullptr))), fetch_##FieldName<Flags>(self->object)) \
 DEFINE_Getter(FieldName, W_COUNTER_##FieldName - 1, Flags) \
 ADD_TO_METAOBJECT(FieldName, decltype(fetch_##FieldName<Flags>(static_cast<value_type*>(nullptr))), Flags) \
