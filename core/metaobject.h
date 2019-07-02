@@ -126,16 +126,6 @@ private:
 template<typename T, typename Base1 = void, typename Base2 = void, typename Base3 = void>
 class MetaObjectImpl : public MetaObject
 {
-public:
-    explicit MetaObjectImpl() = default;
-
-    template<typename ...Args_t>
-    MetaObjectImpl(const QString &className, const std::tuple<Args_t...> &properties)
-    {
-        setClassName(className);
-        addPropertiesToMetaObject(properties, std::integral_constant<size_t, 0>());
-    }
-
 protected:
     void *castToBaseClass(void *object, int baseClassIndex) const override
     {
@@ -171,17 +161,6 @@ protected:
     bool isClassPolymorphic() const override
     {
         return IsPolymorphic<T>();
-    }
-private:
-    template<typename ...Args_t>
-    void addPropertiesToMetaObject(const std::tuple<Args_t...> &, std::integral_constant<size_t, sizeof...(Args_t)>)
-    {}
-
-    template<std::size_t I, typename ...Args_t, typename = typename std::enable_if<I!=sizeof...(Args_t)>::type >
-    void addPropertiesToMetaObject(const std::tuple<Args_t...> &properties, std::integral_constant<size_t, I>)
-    {
-        addProperty(std::get<I>(properties));
-        addPropertiesToMetaObject(properties, std::integral_constant<size_t, I + 1>());
     }
 };
 ///@endcond

@@ -415,21 +415,21 @@ private slots:
 
         QCOMPARE(mo->className(), QStringLiteral("SimpleNonQObjectTestObject"));
         QCOMPARE(mo->propertyCount(), 2);
-        QCOMPARE(mo->propertyAt(0)->name(), "x");
+        QCOMPARE(mo->propertyAt(0)->name(), "y"); // TODO is it a problem that the meta object lists the properties in inverted order?
         QCOMPARE(mo->propertyAt(0)->typeName(), "int");
-        QCOMPARE(mo->propertyAt(0)->value(&*w), 1); // FIXME Fix the getter-API for accessing values through ObjectHandle-MetaObjects
-        QCOMPARE(mo->propertyAt(1)->name(), "y");
+        QCOMPARE(mo->propertyAt(0)->value(&*w), 2); // FIXME Fix the getter-API for accessing values through ObjectHandle-MetaObjects
+        QCOMPARE(mo->propertyAt(1)->name(), "x");
         QCOMPARE(mo->propertyAt(1)->typeName(), "int");
-        QCOMPARE(mo->propertyAt(1)->value(&*w), 2);
+        QCOMPARE(mo->propertyAt(1)->value(&*w), 1);
 
         t.setX(16);
         t.y = 20;
 
-        QCOMPARE(mo->propertyAt(0)->value(&*w), 1);
-        QCOMPARE(mo->propertyAt(1)->value(&*w), 2);
+        QCOMPARE(mo->propertyAt(0)->value(&*w), 2);
+        QCOMPARE(mo->propertyAt(1)->value(&*w), 1);
         w.refresh();
-        QCOMPARE(mo->propertyAt(0)->value(&*w), 16);
-        QCOMPARE(mo->propertyAt(1)->value(&*w), 20);
+        QCOMPARE(mo->propertyAt(0)->value(&*w), 20);
+        QCOMPARE(mo->propertyAt(1)->value(&*w), 16);
 
     }
 };

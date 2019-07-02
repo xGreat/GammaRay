@@ -189,9 +189,11 @@ friend auto MethodName(ThisClass_t *self, w_number<Counter> w_counter) \
 }
 
 #define ADD_TO_METAOBJECT(FieldName, FieldType, Flags) \
-STATE_APPEND(w_metadata, W_COUNTER_##FieldName, MetaProperty*, \
-    GammaRay::MetaPropertyFactory::makeProperty(#FieldName, &ThisClass_t::FieldName) \
-) \
+friend void w_metadata(ThisClass_t *self, w_number<W_COUNTER_##FieldName> w_counter, MetaObject *mo) \
+{ \
+    mo->addProperty(GammaRay::MetaPropertyFactory::makeProperty(#FieldName, &ThisClass_t::FieldName)); \
+    w_metadata(self, w_number< W_COUNTER_##FieldName - 1 >{}, mo); \
+}
 
 /**
  * Defines a constexpr variable that fetches the current value of the count
@@ -288,15 +290,15 @@ public: \
     using value_type = Class; \
     using ThisClass_t = ObjectWrapper<Class>; \
     friend std::tuple<> w_data(ObjectWrapper<Class> *, w_number<0>) { return {}; } \
-    friend std::tuple<> w_metadata(ObjectWrapper<Class> *, w_number<0>) { return {}; } \
+    friend void w_metadata(ObjectWrapper<Class> *, w_number<0>, MetaObject *) {} \
     friend void w_connectToUpdates(ObjectWrapper<Class> *, w_number<0>) {} \
  \
     __VA_ARGS__; \
  \
     using ControlData = ControlBlock<Class, decltype( w_data(static_cast<ObjectWrapper<Class>*>(nullptr), w_number<255>()) )>; \
     static MetaObject *staticMetaObject() { \
-        static MetaObjectImpl<Class> mo { QStringLiteral(#Class), w_metadata(static_cast<ObjectWrapper<Class>*>(nullptr), w_number<255>()) }; \
-        return &mo; \
+        static auto mo = createStaticMetaObject(); \
+        return mo.get(); \
     } \
  \
     explicit ObjectWrapper<Class>(Class *object) \
@@ -311,6 +313,12 @@ public: \
     explicit ObjectWrapper<Class>() = default; \
  \
 private: \
+    static std::unique_ptr<MetaObject> createStaticMetaObject() { \
+        auto mo = new MetaObjectImpl<Class>; \
+        mo->setClassName(QStringLiteral(#Class)); \
+        w_metadata(static_cast<ObjectWrapper<Class>*>(nullptr), w_number<255>(), mo); \
+        return std::unique_ptr<MetaObject>{mo}; \
+    } \
     friend class ObjectWrapperBase; \
     friend class ObjectWrapperTest; \
     friend class ObjectHandle<Class>; \
