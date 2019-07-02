@@ -59,12 +59,6 @@ template<typename T> class error;
 
 template<int i> class err;
 
-
-template<typename T1, typename T2>
-typename std::enable_if<std::is_same<T1, T2>::value, T1*>::type noop(T1 *t1) { return t1; }
-template<typename T1, typename T2>
-typename std::enable_if<std::is_same<T1, T2>::value, const T1*>::type noop(const T1 *t1) { return t1; }
-
 /**
  * May only be used in cases, where non-constexpr if would still produce valid code
  */
@@ -128,19 +122,19 @@ template<int Flags, typename T = value_type, typename std::enable_if<(Flags & Ge
 static auto fetch_##FieldName(const T *object) \
 -> decltype(wrap<Flags>(std::declval<T>().FieldName())) \
 { \
-    return wrap<Flags>(noop<T, value_type>(object)->FieldName()); \
+    return wrap<Flags>(object->FieldName()); \
 } \
 template<int Flags, typename T = value_type, typename std::enable_if<(Flags & NonConstGetter) != 0>::type* = nullptr> \
 static auto fetch_##FieldName(T *object) \
 -> decltype(wrap<Flags>(std::declval<T>().FieldName())) \
 { \
-    return wrap<Flags>(noop<T, value_type>(object)->FieldName()); \
+    return wrap<Flags>(object->FieldName()); \
 } \
 template<int Flags, typename T = value_type, typename std::enable_if<(Flags & MemberVar) != 0>::type* = nullptr> \
 static auto fetch_##FieldName(const T *object) \
 -> decltype(wrap<Flags>(std::declval<T>().FieldName)) \
 { \
-    return wrap<Flags>(noop<T, value_type>(object)->FieldName); \
+    return wrap<Flags>(object->FieldName); \
 } \
 
 /**
