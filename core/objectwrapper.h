@@ -229,24 +229,6 @@ friend void w_connectToUpdates(ThisClass_t *self, w_number<W_COUNTER_##FieldName
 } \
 
 
-
-/**
- * Adds a member field to the object wrapper. The data will be accessible
- * through a getter in the wrapper, named as \p FieldName and will contain the
- * result of a call to `obj->\p Command`.
- *
- * Example: If you used obj->x() before to access some data, you can make that
- * available to the wrapper, by writing `MEMBER(x, x())`. Later, use wrapper.x()
- * to access it.
- */
-#define MEMBER(FieldName, Command, Flags) \
-DEFINE_COUNTER(W_COUNTER_##FieldName, w_data) \
-DEFINE_FETCH_FUNCTION(FieldName, Command, Flags) \
-STATE_APPEND(w_data, W_COUNTER_##FieldName, decltype(fetch_##FieldName<Flags>(static_cast<value_type*>(nullptr))), fetch_##FieldName<Flags>(self->object)) \
-DEFINE_Getter(FieldName, W_COUNTER_##FieldName - 1, Flags) \
-ADD_TO_METAOBJECT(FieldName, decltype(fetch_##FieldName<Flags>(static_cast<value_type*>(nullptr))), Flags) \
-
-
 /**
  * Adds a member field to the object wrapper. The data will be accessible
  * through a getter in the wrapper, named as \p FieldName and will contain the
@@ -279,67 +261,6 @@ DEFINE_FETCH_FUNCTION_LAMBDA(FieldName, Lambda) \
 STATE_APPEND(w_data, W_COUNTER_##FieldName, decltype(fetch_##FieldName<Flags>(static_cast<value_type*>(nullptr))), fetch_##FieldName<Flags>(self->object)) \
 DEFINE_Getter(FieldName, W_COUNTER_##FieldName - 1, Flags) \
 ADD_TO_METAOBJECT(FieldName, decltype(fetch_##FieldName<Flags>(static_cast<value_type*>(nullptr))), Flags) \
-
-
-
-
-/**
- * Adds a member field for a Q_PROPERTY. As with usual getters, the data will be
- * accessible through a getter in the wrapper, named as \p FieldName and will
- * contain the result of a call to `obj->\p Command`. \p Command is necessary to
- * provide a strongly typed API, as Q_PROPERTIES are type-erased.
- *
- * Unlike MEMBER, this will receive updates through notify-signals.
- * \sa MEMBER
- * \sa MEMBER_WITH_NOTIFY
- */
-#define QProp_MEMBER(FieldName, Command) \
-MEMBER(FieldName, Command, Getter) \
-friend void w_connectToUpdates(ThisClass_t *self, w_number<W_COUNTER_##FieldName>) \
-{ \
- \
-    connectToUpdates< W_COUNTER_##FieldName - 1 >(self, [](value_type *obj) { return wrap<0>(obj->Command()); }, #FieldName); \
-    w_connectToUpdates(self, w_number< W_COUNTER_##FieldName - 1 >{}); \
-} \
-
-/**
- * Adds a member field to the object wrapper, which can update itself by
- * listening to the \p NotifySignal. Use only the signal's identifier as
- * parameter to NotifySignal.
- *
- * Example:
- * MEMBER_WITH_NOTIFY(parent, parentItem(), itemReparented)
- *
- * \sa MEMBER
- */
-#define MEMBER_WITH_NOTIFY(FieldName, Command, NotifySignal) \
-MEMBER(FieldName, Command, Getter) \
-friend void w_connectToUpdates(ThisClass_t *self, w_number<W_COUNTER_##FieldName>) \
-{ \
-    connectToUpdates< W_COUNTER_##FieldName - 1 >(self, [](value_type *obj) { return wrap<0>(obj->Command()); }, &value_type::NotifySignal); \
-    w_connectToUpdates(self, w_number< W_COUNTER_##FieldName - 1 >{}); \
-} \
-
-/**
- * Adds a member field for data which is only available through the private
- * object and can be updated through a notifySignal. The notify signal is
- * assumed to be a signal of the object, not the private object.
- *
- * \sa DptrMember
- * \sa MEMBER_WITH_NOTIFY
- */
-#define DptrMember_WITH_NOTIFY(PrivateClass, FieldName, Command, NotifySignal) \
-DEFINE_COUNTER(W_COUNTER_##FieldName, w_data) \
-DEFINE_FETCH_FUNCTION(FieldName, Command) \
-STATE_APPEND(w_data, W_COUNTER_##FieldName, decltype(fetch_##FieldName<Flags>(static_cast<value_type*>(nullptr))), fetch_##FieldName<Flags>(self->object)) \
-DEFINE_Getter(FieldName, W_COUNTER_##FieldName - 1,  0) \
-friend void w_connectToUpdates(ThisClass_t *self, w_number<W_COUNTER_##FieldName>) \
-{ \
-    connectToUpdates< W_COUNTER_##FieldName - 1 >(self, [](value_type *obj) { return wrap<0>(PrivateClass::get(obj)->Command); }, \
-                                                  &value_type::NotifySignal); \
-    w_connectToUpdates(self, w_number< W_COUNTER_##FieldName - 1 >{}); \
-} \
-
 
 
 #define DIRECT_ACCESS_METHOD(MethodName) \
