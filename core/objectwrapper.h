@@ -197,7 +197,7 @@ friend auto MethodName(ThisClass_t *self, __number<Counter> __counter) \
  * This is meant for internal use in other macros only.
  */
 #define ADD_TO_METAOBJECT(FieldName, FieldType, Flags) \
-friend void __metadata(ThisClass_t *self, __number<W_COUNTER_##FieldName> __counter, MetaObject *mo) \
+friend void __metadata(ThisClass_t *self, __number<W_COUNTER_##FieldName>, MetaObject *mo) \
 { \
     mo->addProperty(GammaRay::MetaPropertyFactory::makeProperty(#FieldName, &ThisClass_t::FieldName)); \
     __metadata(self, __number< W_COUNTER_##FieldName - 1 >{}, mo); \
@@ -399,9 +399,9 @@ private: \
     friend class ObjectHandle<Class>; \
     std::shared_ptr<ControlData> m_control; \
 }; \
-Q_DECLARE_METATYPE(GammaRay::ObjectWrapper<Class>); \
-Q_DECLARE_METATYPE(GammaRay::ObjectHandle<Class>); \
-Q_DECLARE_METATYPE(GammaRay::WeakObjectHandle<Class>); \
+Q_DECLARE_METATYPE(GammaRay::ObjectWrapper<Class>) \
+Q_DECLARE_METATYPE(GammaRay::ObjectHandle<Class>) \
+Q_DECLARE_METATYPE(GammaRay::WeakObjectHandle<Class>) \
 
 
 
@@ -453,7 +453,7 @@ protected:
     static void initialize(Derived_t *self);
 
     template<int storageIndex, int Flags, typename Derived_t, typename CommandFunc_t, typename std::enable_if<!(Flags & QProp)>::type* = nullptr>
-    static void connectToUpdates(Derived_t *self, CommandFunc_t command, const char* propertyName) {}
+    static void connectToUpdates(Derived_t *, CommandFunc_t, const char*) {}
 
     template<int storageIndex, int Flags, typename Derived_t, typename CommandFunc_t, typename std::enable_if<Flags & QProp>::type* = nullptr>
     static void connectToUpdates(Derived_t *self, CommandFunc_t command, const char* propertyName);
@@ -552,7 +552,7 @@ private:
 // === ObjectWrapperBase ===
 
 template<typename T>
-auto checkCorrectThread(T *obj) -> typename std::enable_if<!std::is_base_of<QObject, T>::value, bool>::type
+auto checkCorrectThread(T*) -> typename std::enable_if<!std::is_base_of<QObject, T>::value, bool>::type
 {
     return true;
 }

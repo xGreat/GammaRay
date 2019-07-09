@@ -49,7 +49,7 @@ using namespace GammaRay;
 
 class SimpleNonQObjectTestObject {
 public:
-    explicit SimpleNonQObjectTestObject(int x, int y) : m_x(x), y(y) {}
+    explicit SimpleNonQObjectTestObject(int x, int y) : y(y), m_x(x) {}
 
     void setX(int x) { m_x = x; }
 
@@ -63,7 +63,7 @@ private:
 // class Foo {
 //
 //
-//     using value_type = SimpleNonQObjectTestObject;                                                                                                           \
+//     using value_type = SimpleNonQObjectTestObject;
 //     using ThisClass_t = Foo;
 //
 //     static constexpr int Flags = 0;
