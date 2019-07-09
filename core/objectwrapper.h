@@ -81,12 +81,13 @@ enum ObjectWrapperFlag {
 
 
 /**
- * Adds the inline definition of a getter function with the name @p FieldName,
- * which returns the data stored at index @p StorageIndex in
- * m_control->dataStorage.
+ * Defines a getter function with the name @p FieldName, which returns the data
+ * stored at index @p StorageIndex in m_control->dataStorage or - in the
+ * non-caching case - the live value of the property.
+ *
  * This is internal for use in other macros.
  */
-#define DEFINE_Getter(FieldName, StorageIndex, Flags) \
+#define DEFINE_GETTER(FieldName, StorageIndex, Flags) \
 decltype(fetch_##FieldName<Flags>(static_cast<value_type*>(nullptr))) FieldName() const \
 { \
     m_control->semaphore.acquire(); \
@@ -102,7 +103,11 @@ decltype(fetch_##FieldName<Flags>(static_cast<value_type*>(nullptr))) FieldName(
 
 
 /**
- * Wraps the getter command in a non-caching getter function.
+ * Defines a wrapper function for direct access to the property, abstracting
+ * away the different kinds of properties (getter, member variable, custom
+ * command).  This differs from the DEFINE_GETTER in that the fetch function
+ * never caches things. Instead it's used to update the cache.
+ *
  * This is internal for use in other macros.
  */
 #define DEFINE_FETCH_FUNCTION_PROP(FieldName) \
@@ -138,7 +143,8 @@ static auto fetch_##FieldName(const T *object) \
 } \
 
 /**
- * Wraps the getter command in a non-caching getter function.
+ * Like DEFINE_FETCH_FUNCTION_PROP but with custom expression.
+ *
  * This is internal for use in other macros.
  */
 #define DEFINE_FETCH_FUNCTION_CUSTOM_EXPRESSION(FieldName, Expr) \
@@ -150,27 +156,6 @@ static auto fetch_##FieldName(const T *object) \
 } \
 
 
-/**
- * Adds the inline definition of a method, which holds state using overloading
- * and inheritance tricks as described at
- * https://woboq.com/blog/verdigris-implementation-tricks.html
- *
- * Incrementing the counter is done by using a combination of STATE_APPEND and
- * DEFINE_COUNTER. Use DEFINE_COUNTER to define a constexpr variable holding the
- * current count + 1. Use STATE_APPEND to make it the new current count.
- *
- * Use BodyExpression to return arbitary content, possibly using recursion. Eg.
- * you can do
- * `std::tuple_cat(MethodName(self, w_counter.prev()), std::make_tuple(...)))`
- * to recursively compose a compile-time list.
- *
- * This is meant for internal use in other MACROS only.
- */
-
-// template<typename T, typename ...TupleArgs_t>
-// auto tuple_append(std::tuple<TupleArgs_t...>, T) -> std::tuple<TupleArgs_t..., T>;
-// template<typename Tuple_t, typename T>
-// using tuple_append_t = decltype(tuple_append(std::declval<Tuple_t>(), std::declval<T>()));
 
 template<typename T, typename ...Args>
 struct tuple_append {};
@@ -181,18 +166,41 @@ struct tuple_append<std::tuple<TupleArgs_t...>, T> {
 template<typename Tuple_t, typename T>
 using tuple_append_t = typename tuple_append<Tuple_t, T>::type;
 
+
+/**
+ * Defines a method, which holds state using overloading and inheritance tricks
+ * as described at https://woboq.com/blog/verdigris-implementation-tricks.html
+ *
+ * Incrementing the counter is done by using a combination of STATE_APPEND and
+ * DEFINE_COUNTER. Use DEFINE_COUNTER to define a constexpr variable holding the
+ * current count + 1. Use STATE_APPEND to make it the new current count.
+ *
+ * Use StateExpression to return arbitary content, possibly using recursion. Eg.
+ * you can do
+ * `std::tuple_cat(MethodName(self, __counter.prev()), std::make_tuple(...)))`
+ * to recursively compose a compile-time list.
+ *
+ * This is meant for internal use in other macros only.
+ */
 #define STATE_APPEND(MethodName, Counter, AppendedType, StateExpr) \
-friend auto MethodName(ThisClass_t *self, w_number<Counter> w_counter) \
--> tuple_append_t<decltype(MethodName(self, w_counter.prev())), AppendedType> \
+friend auto MethodName(ThisClass_t *self, __number<Counter> __counter) \
+-> tuple_append_t<decltype(MethodName(self, __counter.prev())), AppendedType> \
 { \
-    return std::tuple_cat(MethodName(self, w_counter.prev()), std::make_tuple(StateExpr)); \
+    return std::tuple_cat(MethodName(self, __counter.prev()), std::make_tuple(StateExpr)); \
 }
 
+/**
+ * Defines an overload to __metadata, which adds \p FieldName to the metaobject
+ * and recursively calls the previously defined overload of __metadata.
+ * (see https://woboq.com/blog/verdigris-implementation-tricks.html).
+ *
+ * This is meant for internal use in other macros only.
+ */
 #define ADD_TO_METAOBJECT(FieldName, FieldType, Flags) \
-friend void w_metadata(ThisClass_t *self, w_number<W_COUNTER_##FieldName> w_counter, MetaObject *mo) \
+friend void __metadata(ThisClass_t *self, __number<W_COUNTER_##FieldName> __counter, MetaObject *mo) \
 { \
     mo->addProperty(GammaRay::MetaPropertyFactory::makeProperty(#FieldName, &ThisClass_t::FieldName)); \
-    w_metadata(self, w_number< W_COUNTER_##FieldName - 1 >{}, mo); \
+    __metadata(self, __number< W_COUNTER_##FieldName - 1 >{}, mo); \
 }
 
 /**
@@ -213,49 +221,97 @@ friend void w_metadata(ThisClass_t *self, w_number<W_COUNTER_##FieldName> w_coun
  */
 #define DEFINE_COUNTER(CounterName, CounterMethod) \
 static constexpr int CounterName = \
-std::tuple_size<decltype(CounterMethod(static_cast<ThisClass_t*>(nullptr), w_number<255>{}))>::value + 1; \
+std::tuple_size<decltype(CounterMethod(static_cast<ThisClass_t*>(nullptr), __number<255>{}))>::value + 1; \
 
 
+/**
+ * Defines an overload to __connectToUpdates, which connects an update property
+ * slot to the notify signal of the property \p FieldName. It then recursively
+ * calls the previously defined overload of __connectToUpdates
+ * (see https://woboq.com/blog/verdigris-implementation-tricks.html).
+ *
+ * This is meant for internal use in other macros only.
+ */
 #define CONNECT_TO_UPDATES(FieldName, Flags) \
-friend void w_connectToUpdates(ThisClass_t *self, w_number<W_COUNTER_##FieldName>) \
+friend void __connectToUpdates(ThisClass_t *self, __number<W_COUNTER_##FieldName>) \
 { \
     connectToUpdates< W_COUNTER_##FieldName - 1, Flags >(self, &ThisClass_t::fetch_##FieldName<Flags>, #FieldName); \
-    w_connectToUpdates(self, w_number< W_COUNTER_##FieldName - 1 >{}); \
+    __connectToUpdates(self, __number< W_COUNTER_##FieldName - 1 >{}); \
 } \
 
 
 /**
- * Adds a member field to the object wrapper. The data will be accessible
- * through a getter in the wrapper, named as \p FieldName and will contain the
- * result of a call to `obj->\p Command`.
+ * Adds a property to the object wrapper. The data will be accessible
+ * through a getter in the wrapper, named as \p FieldName.
+ *
+ * The property can be customized by a couple of \p Flags:
+ *  Getter: If this flag is set, data will be fetched using obj->FieldName()
+ *  NonConstGetter: Like getter, but indicating that the getter is non-const
+ *  MemberVar: Data will be fetched by accessing the member field obj->FieldName directly
+ *  DptrGetter: Data will be fetched by accessing ClassPrivate::get(obj)->FieldName()
+ *  DptrMember: Data will be fetched by accessing ClassPrivate::get(obj)->FieldName
+ *  CustomCommand: Incompatible with this macro. Use CUSTOM_PROP instead.
+ *
+ *  QProp: Indicates that there exists a Qt property with this name. Setting
+ *         this flag will enable reading, writing as well as automatic updating.
+ *  OwningPointer: Indicates that the object owns the object which this property
+ *                 points to. Setting this correctly is crucial for memory
+ *                 management of the object wrapper.
+ *  NonOwningPointer Indicates that this object does not own the object which
+ *                   this property points to. Setting this correctly is crucial
+ *                   for memory management of the object wrapper.
+ *
+ * It is necessary to set one of Getter/NonConstGetter/MemberVar/DptrGetter/
+ * DptrMember. Further, for properties that are pointers to other wrappable
+ * objects, it's necessary to set either OwningPointer or NonOwningPointer.
  *
  * Example: If you used obj->x() before to access some data, you can make that
- * available to the wrapper, by writing `MEMBER(x, x())`. Later, use wrapper.x()
+ * available to the wrapper, by writing `PROP(x, Getter)`. Later, use wrapper.x()
  * to access it.
  */
 #define PROP(FieldName, Flags) \
-DEFINE_COUNTER(W_COUNTER_##FieldName, w_data) \
+DEFINE_COUNTER(W_COUNTER_##FieldName, __data) \
 DEFINE_FETCH_FUNCTION_PROP(FieldName) \
-STATE_APPEND(w_data, W_COUNTER_##FieldName, decltype(fetch_##FieldName<Flags>(static_cast<value_type*>(nullptr))), fetch_##FieldName<Flags>(self->object)) \
-DEFINE_Getter(FieldName, W_COUNTER_##FieldName - 1, Flags) \
+STATE_APPEND(__data, W_COUNTER_##FieldName, decltype(fetch_##FieldName<Flags>(static_cast<value_type*>(nullptr))), fetch_##FieldName<Flags>(self->object)) \
+DEFINE_GETTER(FieldName, W_COUNTER_##FieldName - 1, Flags) \
 ADD_TO_METAOBJECT(FieldName, decltype(fetch_##FieldName<Flags>(static_cast<value_type*>(nullptr))), Flags) \
 CONNECT_TO_UPDATES(FieldName, Flags) \
 
 /**
- * Adds a member field to the object wrapper. The data will be accessible
- * through a getter in the wrapper, named as \p FieldName and will contain the
- * result of a call to `obj->\p Command`.
+ * Adds a property to the object wrapper. The data will be accessible
+ * through a getter in the wrapper, named as \p FieldName. The value of the
+ * property will be given by evaluating the expression \p Expression in a
+ * context where `object` is a valid C-pointer pointing to the wrapped object.
  *
- * Example: If you used obj->x() before to access some data, you can make that
- * available to the wrapper, by writing `MEMBER(x, x())`. Later, use wrapper.x()
- * to access it.
+ * The property can be customized by a couple of \p Flags:
+ *  Getter, NonConstGetter, MemberVar, DptrGetter, DptrMember: Incompatible
+ *      with this macro. Use PROP instead.
+ *  CustomCommand: Optional when using this macro. Indicates that data is to be
+ *                 fetched using the custom command \p Expression.
+ *
+ *  QProp: Indicates that there exists a Qt property with this name. Setting
+ *         this flag will enable reading, writing as well as automatic updating.
+ *  OwningPointer: Indicates that the object owns the object which this property
+ *                 points to. Setting this correctly is crucial for memory
+ *                 management of the object wrapper.
+ *  NonOwningPointer Indicates that this object does not own the object which
+ *                   this property points to. Setting this correctly is crucial
+ *                   for memory management of the object wrapper.
+ *
+ * For properties that are pointers to other wrappable objects, it's necessary
+ * to set either OwningPointer or NonOwningPointer.
+ *
+ * Example: Let Utils::getQmlId(QQuickItem*) be defined. To add a property id to
+ * the wrapper of QQuickItem, use `CUSTOM_PROP(id, Utils::getQmlId(object), CustomCommand)`.
+ * Later, use wrapper.id() to access it.
  */
 #define CUSTOM_PROP(FieldName, Expression, Flags) \
-DEFINE_COUNTER(W_COUNTER_##FieldName, w_data) \
+DEFINE_COUNTER(W_COUNTER_##FieldName, __data) \
 DEFINE_FETCH_FUNCTION_CUSTOM_EXPRESSION(FieldName, Expression) \
-STATE_APPEND(w_data, W_COUNTER_##FieldName, decltype(fetch_##FieldName<Flags>(static_cast<value_type*>(nullptr))), fetch_##FieldName<Flags>(self->object)) \
-DEFINE_Getter(FieldName, W_COUNTER_##FieldName - 1, Flags) \
-ADD_TO_METAOBJECT(FieldName, decltype(fetch_##FieldName<Flags>(static_cast<value_type*>(nullptr))), Flags) \
+STATE_APPEND(__data, W_COUNTER_##FieldName, \
+    decltype(fetch_##FieldName<Flags | CustomCommand>(static_cast<value_type*>(nullptr))), fetch_##FieldName<Flags | CustomCommand>(self->object)) \
+DEFINE_GETTER(FieldName, W_COUNTER_##FieldName - 1, Flags | CustomCommand) \
+ADD_TO_METAOBJECT(FieldName, decltype(fetch_##FieldName<Flags | CustomCommand>(static_cast<value_type*>(nullptr))), Flags | CustomCommand) \
 
 
 #define DIRECT_ACCESS_METHOD(MethodName) \
@@ -277,8 +333,27 @@ template<typename ...Args> void MethodName(Args &&...args) \
     call(object, &value_type::MethodName, args...); \
 } \
 
+/**
+ * Put this macro in the va_args area of DECLARE_OBJECT_WRAPPER to disable
+ * caching for this class. Disabling caching means that accessing the wrapped
+ * getters will always return the live value by accessing the underlying
+ * getter/member directly.
+ *
+ * Disabling caching is mainly meant as a porting aid.
+ */
 #define DISABLE_CACHING using disableCaching_t = void;
 
+/**
+ * Defines a specialization of the dummy ObjectWrapper class template for
+ * \p Class. This is the main macro for enabling wrapping capabilities for a
+ * given class.
+ *
+ * This macro has two arguments. The first one is the name of the class to be
+ * wrapped. The second argument is a free-form area that can be used to put
+ * arbitrary content into the wrapper class. Its mostly meant, though, to put
+ * PROP and CUSTOM_PROP macros in there, which define properties, the wrapper
+ * will have. Also put DISABLE_CACHING here, if desired.
+ */
 #define DECLARE_OBJECT_WRAPPER(Class, ...) \
 template<> \
 class GammaRay::ObjectWrapper<Class> : public GammaRay::ObjectWrapperBase \
@@ -289,13 +364,13 @@ private: \
 public: \
     using value_type = Class; \
     using ThisClass_t = ObjectWrapper<Class>; \
-    friend std::tuple<> w_data(ObjectWrapper<Class> *, w_number<0>) { return {}; } \
-    friend void w_metadata(ObjectWrapper<Class> *, w_number<0>, MetaObject *) {} \
-    friend void w_connectToUpdates(ObjectWrapper<Class> *, w_number<0>) {} \
+    friend std::tuple<> __data(ObjectWrapper<Class> *, __number<0>) { return {}; } \
+    friend void __metadata(ObjectWrapper<Class> *, __number<0>, MetaObject *) {} \
+    friend void __connectToUpdates(ObjectWrapper<Class> *, __number<0>) {} \
  \
     __VA_ARGS__; \
  \
-    using ControlData = ControlBlock<Class, decltype( w_data(static_cast<ObjectWrapper<Class>*>(nullptr), w_number<255>()) )>; \
+    using ControlData = ControlBlock<Class, decltype( __data(static_cast<ObjectWrapper<Class>*>(nullptr), __number<255>()) )>; \
     static MetaObject *staticMetaObject() { \
         static auto mo = createStaticMetaObject(); \
         return mo.get(); \
@@ -316,7 +391,7 @@ private: \
     static std::unique_ptr<MetaObject> createStaticMetaObject() { \
         auto mo = new MetaObjectImpl<Class>; \
         mo->setClassName(QStringLiteral(#Class)); \
-        w_metadata(static_cast<ObjectWrapper<Class>*>(nullptr), w_number<255>(), mo); \
+        __metadata(static_cast<ObjectWrapper<Class>*>(nullptr), __number<255>(), mo); \
         return std::unique_ptr<MetaObject>{mo}; \
     } \
     friend class ObjectWrapperBase; \
@@ -333,12 +408,12 @@ Q_DECLARE_METATYPE(GammaRay::WeakObjectHandle<Class>); \
 namespace GammaRay {
 
 
-template<int N> struct w_number : public w_number<N - 1> {
+template<int N> struct __number : public __number<N - 1> {
     static constexpr int value = N;
-    static constexpr w_number<N-1> prev() { return {}; }
+    static constexpr __number<N-1> prev() { return {}; }
 };
 // Specialize for 0 to break the recursion.
-template<> struct w_number<0> { static constexpr int value = 0; };
+template<> struct __number<0> { static constexpr int value = 0; };
 
 template<typename T1, typename T2> using second_t = T2;
 
@@ -514,9 +589,9 @@ void ObjectWrapperBase::initialize(Derived_t *self)
 
     IF_CONSTEXPR (!cachingDisabled<Derived_t>::value) {
         QMutexLocker locker { Probe::objectLock() };
-        self->m_control->dataStorage = w_data(self, w_number<255>());
+        self->m_control->dataStorage = __data(self, __number<255>());
 
-        w_connectToUpdates(self, w_number<255>{});
+        __connectToUpdates(self, __number<255>{});
     }
 }
 
@@ -645,7 +720,7 @@ auto ObjectHandle<T>::call(Func &&f, Args &&...args) -> std::future<decltype(std
 template<typename T>
 void ObjectHandle<T>::refresh()
 {
-    m_objectWrapper.m_control->dataStorage = w_data(&m_objectWrapper, w_number<255>());
+    m_objectWrapper.m_control->dataStorage = __data(&m_objectWrapper, __number<255>());
 }
 
 
