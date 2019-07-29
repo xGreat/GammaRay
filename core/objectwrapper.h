@@ -100,6 +100,28 @@ decltype(fetch_##FieldName<Flags>(static_cast<value_type*>(nullptr))) FieldName(
     } \
 } \
 
+/**
+ * Defines a setter function with the name @p SetterName, which sets the cached
+ * value stored at index @p StorageIndex in m_control->dataStorage and
+ * (in the multi-threaded case deferredly) updates the actual property value.
+ * In the non-caching case it just sets the live value of the property directly.
+ *
+ * This is internal for use in other macros.
+ */
+#define DEFINE_SETTER(FieldName, SetterName, StorageIndex, Flags) \
+void SetterName(decltype(fetch_##FieldName<Flags>(static_cast<value_type*>(nullptr))) newValue) \
+{ \
+    m_control->semaphore.acquire(); \
+    QSemaphoreReleaser releaser { &m_control->semaphore }; \
+    \
+    IF_CONSTEXPR (cachingDisabled<ThisClass_t>::value) { \
+        write_##FieldName<Flags>(m_control->object, newValue); \
+    } else { \
+        std::get< StorageIndex >(m_control->dataStorage) = newValue; \
+        /* TODO Defer calling the setter */ \
+        write_##FieldName<Flags>(m_control->object, newValue); \
+    } \
+} \
 
 
 /**
@@ -153,6 +175,42 @@ static auto fetch_##FieldName(const T *object) \
 -> decltype(wrap<Flags>(Expr)) \
 { \
     return wrap<Flags>(Expr); \
+} \
+
+
+/**
+ * Defines a wrapper function for direct write access to the property,
+ * abstracting away the different methods of writing properties (setter, member
+ * variable, custom command).  This differs from the DEFINE_SETTER in that the
+ * write function never caches things. Instead it's used to update the cache.
+ *
+ * This is internal for use in other macros.
+ */
+#define DEFINE_WRITE_FUNCTION_PROP(FieldName, SetterName) \
+template<int Flags, typename T = value_type, typename std::enable_if<(Flags & DptrGetter) != 0>::type* = nullptr> /*FIXME T must be the private class! */ \
+static void write_##FieldName(value_type *object, decltype(std::declval<T>().FieldName()) newVal) \
+{ \
+    T::get(object)->SetterName(newVal); \
+} \
+template<int Flags, typename T = value_type, typename std::enable_if<(Flags & DptrMember) != 0>::type* = nullptr> /*FIXME T must be the private class! */ \
+static void write_##FieldName(value_type *object, decltype(std::declval<T>().FieldName) newVal) \
+{ \
+    T::get(object)->FieldName = newVal; \
+} \
+template<int Flags, typename T = value_type, typename std::enable_if<(Flags & Getter) != 0>::type* = nullptr> \
+static void write_##FieldName(T *object, decltype(std::declval<T>().FieldName()) newVal) \
+{ \
+    object->SetterName(newVal); \
+} \
+template<int Flags, typename T = value_type, typename std::enable_if<(Flags & NonConstGetter) != 0>::type* = nullptr> \
+static void write_##FieldName(T *object, decltype(std::declval<T>().FieldName()) newVal) \
+{ \
+    object->SetterName(newVal); \
+} \
+template<int Flags, typename T = value_type, typename std::enable_if<(Flags & MemberVar) != 0>::type* = nullptr> \
+static void write_##FieldName(T *object, decltype(std::declval<T>().FieldName) newVal) \
+{ \
+    object->FieldName = newVal; \
 } \
 
 
@@ -269,11 +327,56 @@ friend void __connectToUpdates(ThisClass_t *self, __number<W_COUNTER_##FieldName
  * available to the wrapper, by writing `PROP(x, Getter)`. Later, use wrapper.x()
  * to access it.
  */
-#define PROP(FieldName, Flags) \
+#define RO_PROP(FieldName, Flags) \
 DEFINE_COUNTER(W_COUNTER_##FieldName, __data) \
 DEFINE_FETCH_FUNCTION_PROP(FieldName) \
 STATE_APPEND(__data, W_COUNTER_##FieldName, decltype(fetch_##FieldName<Flags>(static_cast<value_type*>(nullptr))), fetch_##FieldName<Flags>(self->object)) \
 DEFINE_GETTER(FieldName, W_COUNTER_##FieldName - 1, Flags) \
+ADD_TO_METAOBJECT(FieldName, decltype(fetch_##FieldName<Flags>(static_cast<value_type*>(nullptr))), Flags) \
+CONNECT_TO_UPDATES(FieldName, Flags) \
+
+
+/**
+ * Adds a property to the object wrapper. The data will be accessible
+ * through a getter in the wrapper, named as \p FieldName. Data will be writable
+ * through a setter in the wrapper, named as \p SetterName.
+ *
+ * The property can be customized by a couple of \p Flags:
+ *  Getter: If this flag is set, data will be fetched using obj->FieldName()
+ *          and written using obj->SetterName(newVal).
+ *  NonConstGetter: Like getter, but indicating that the getter is non-const.
+ *  MemberVar: Data will be fetched/written by accessing the member field
+ *             obj->FieldName directly.
+ *  DptrGetter: Data will be fetched by accessing ClassPrivate::get(obj)->FieldName()
+ *              and written using ClassPrivate::get(obj)->SetterName(newVal).
+ *  DptrMember: Data will be fetched/written by accessing
+ *              ClassPrivate::get(obj)->FieldName.
+ *  CustomCommand: Incompatible with this macro. Use CUSTOM_PROP instead.
+ *
+ *  QProp: Indicates that there exists a Qt property with this name. Setting
+ *         this flag will enable reading, writing as well as automatic updating.
+ *  OwningPointer: Indicates that the object owns the object which this property
+ *                 points to. Setting this correctly is crucial for memory
+ *                 management of the object wrapper.
+ *  NonOwningPointer Indicates that this object does not own the object which
+ *                   this property points to. Setting this correctly is crucial
+ *                   for memory management of the object wrapper.
+ *
+ * It is necessary to set one of Getter/NonConstGetter/MemberVar/DptrGetter/
+ * DptrMember. Further, for properties that are pointers to other wrappable
+ * objects, it's necessary to set either OwningPointer or NonOwningPointer.
+ *
+ * Example: If you used obj->x() before to access some data, you can make that
+ * available to the wrapper, by writing `PROP(x, Getter)`. Later, use wrapper.x()
+ * to access it.
+ */
+#define RW_PROP(FieldName, SetterName, Flags) \
+DEFINE_COUNTER(W_COUNTER_##FieldName, __data) \
+DEFINE_FETCH_FUNCTION_PROP(FieldName) \
+DEFINE_WRITE_FUNCTION_PROP(FieldName, SetterName) \
+STATE_APPEND(__data, W_COUNTER_##FieldName, decltype(fetch_##FieldName<Flags>(static_cast<value_type*>(nullptr))), fetch_##FieldName<Flags>(self->object)) \
+DEFINE_GETTER(FieldName, W_COUNTER_##FieldName - 1, Flags) \
+DEFINE_SETTER(FieldName, SetterName, W_COUNTER_##FieldName - 1, Flags) \
 ADD_TO_METAOBJECT(FieldName, decltype(fetch_##FieldName<Flags>(static_cast<value_type*>(nullptr))), Flags) \
 CONNECT_TO_UPDATES(FieldName, Flags) \
 
@@ -483,6 +586,7 @@ public:
     explicit operator T*() const;
 
     inline const ObjectWrapper<T> *operator->() const;
+    inline ObjectWrapper<T> *operator->();
     inline const ObjectWrapper<T> &operator*() const;
     inline ObjectWrapper<T> &operator*();
 
@@ -672,6 +776,12 @@ ObjectHandle<T>::operator T*() const
 
 template<typename T>
 const ObjectWrapper<T> *ObjectHandle<T>::operator->() const
+{
+    return &m_objectWrapper;
+}
+
+template<typename T>
+ObjectWrapper<T> *ObjectHandle<T>::operator->()
 {
     return &m_objectWrapper;
 }
@@ -894,10 +1004,6 @@ auto wrap(QVector<T*> list) -> second_t<typename ObjectWrapper<T>::value_type, t
 
 //TODO: calling setters, access through d-ptr, QObject-properties as ObjectWrappers (also object-list-properties), central data cache, meta object, updates
 //TODO: Check threading
-
-
-// TODO: Revise shared_ptr-model: we'd actually need GC, because the handles reference each other.
-// TODO: Delete the handles when the QObject is destroyed => connect to destroyed-signal => maybe we don't actually need shared-pointers at all?
 
 // TODO: Look at Event-monitor, lazy-properties, look at Bindings und Signal-Slot connections
 

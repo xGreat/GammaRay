@@ -102,8 +102,8 @@ private:
 
 class QObjectTestObject : public QObject {
     Q_OBJECT
-    Q_PROPERTY(int x READ x WRITE setXX NOTIFY xChanged)
-    Q_PROPERTY(int y READ y WRITE setYY NOTIFY yChanged)
+    Q_PROPERTY(int x READ x WRITE setX NOTIFY xChanged)
+    Q_PROPERTY(int y READ y WRITE setY NOTIFY yChanged)
     Q_PROPERTY(QTimer *t MEMBER t)
 
 signals:
@@ -119,8 +119,8 @@ public:
 
     QObjectTestObject *parent() const { return m_parent; }
 
-    void setXX(int x) { m_x = x; emit xChanged(); }
-    void setYY(int y) { m_y = y; emit yChanged(); }
+    void setX(int x) { m_x = x; emit xChanged(); }
+    void setY(int y) { m_y = y; emit yChanged(); }
 
     QString str() { return QStringLiteral("Hello World"); }
     QString echo(const QString &s) const { return s; }
@@ -191,28 +191,28 @@ public:
 };
 
 DECLARE_OBJECT_WRAPPER(SimpleNonQObjectTestObject,
-                       PROP(x, Getter)
-                       PROP(y, MemberVar)
+                       RO_PROP(x, Getter)
+                       RW_PROP(y, setY, MemberVar)
 )
-DECLARE_OBJECT_WRAPPER(QTimer, PROP(isActive, Getter))
+DECLARE_OBJECT_WRAPPER(QTimer, RO_PROP(isActive, Getter))
 DECLARE_OBJECT_WRAPPER(QObjectTestObject,
-                       PROP(x, Getter | QProp)
-                       PROP(y, Getter | QProp)
-                       PROP(str, NonConstGetter)
+                       RO_PROP(x, Getter | QProp)
+                       RW_PROP(y, setY, Getter | QProp)
+                       RO_PROP(str, NonConstGetter)
                        CUSTOM_PROP(halloDu, object->echo("Hello, you."), CustomCommand)
-                       PROP(t, MemberVar | OwningPointer)
-                       PROP(children, Getter | OwningPointer)
-                       PROP(parent, Getter | NonOwningPointer)
+                       RO_PROP(t, MemberVar | OwningPointer)
+                       RO_PROP(children, Getter | OwningPointer)
+                       RO_PROP(parent, Getter | NonOwningPointer)
                        CUSTOM_PROP(childrenCount, getChildrenCount(object), CustomCommand)
 )
 DECLARE_OBJECT_WRAPPER(LinkedList,
-                       PROP(i, Getter)
-                       PROP(prev, Getter | NonOwningPointer)
-                       PROP(next, Getter | OwningPointer)
+                       RO_PROP(i, Getter)
+                       RO_PROP(prev, Getter | NonOwningPointer)
+                       RO_PROP(next, Getter | OwningPointer)
 )
 DECLARE_OBJECT_WRAPPER(DisabledCachingTestObject,
                        DISABLE_CACHING
-                       PROP(x, Getter)
+                       RO_PROP(x, Getter)
 )
 namespace GammaRay {
 
@@ -244,8 +244,8 @@ private slots:
         QCOMPARE(w->halloDu(), QStringLiteral("Hello, you."));
         QCOMPARE(w->t()->isActive(), t.t->isActive());
 
-        t.setXX(16);
-        t.setYY(20);
+        t.setX(16);
+        t.setY(20);
 
         QCOMPARE(w->x(), t.x());
         QCOMPARE(w->y(), t.y());
@@ -303,8 +303,8 @@ private slots:
 //         QCOMPARE(w->halloDu(), QStringLiteral("Hello, you."));
 //         QCOMPARE(w->t()->isActive(), t.t->isActive());
 //
-//         t.setXX(16);
-//         t.setYY(20);
+//         t.setX(16);
+//         t.setY(20);
 //
 //         QCOMPARE(w->x(), t.x());
 //         QCOMPARE(w->y(), t.y());
@@ -366,8 +366,8 @@ private slots:
         QCOMPARE(w->halloDu(), QStringLiteral("Hello, you."));
         QCOMPARE(w->t()->isActive(), t.t->isActive());
 
-        t.setXX(16);
-        t.setYY(20);
+        t.setX(16);
+        t.setY(20);
 
         QCOMPARE(w->x(), t.x());
         QCOMPARE(w->y(), t.y());
@@ -431,6 +431,17 @@ private slots:
         QCOMPARE(mo->propertyAt(0)->value(&*w), 20);
         QCOMPARE(mo->propertyAt(1)->value(&*w), 16);
 
+    }
+
+    void testWriting()
+    {
+        SimpleNonQObjectTestObject t {1, 2};
+        ObjectHandle<SimpleNonQObjectTestObject> w { &t };
+
+        QCOMPARE(w->y(), t.y);
+        w->setY(20);
+        QCOMPARE(w->y(), 20);
+        QCOMPARE(w->y(), t.y);
     }
 };
 
