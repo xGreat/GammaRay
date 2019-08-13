@@ -46,7 +46,6 @@
 
 using namespace GammaRay;
 
-
 class SimpleNonQObjectTestObject {
 public:
     explicit SimpleNonQObjectTestObject(int x, int y) : y(y), m_x(x) {}
@@ -227,7 +226,7 @@ private slots:
 
     void initTestCase()
     {
-//         ObjectShadowDataRepository::instance()->m_objectToWrapperControlBlockMap.clear(); // FIXME this should not be necessary!
+//         ObjectShadowDataRepository::instance()->m_objectToWrapperPrivateMap.clear(); // FIXME this should not be necessary!
     }
 
     void testBasics()
@@ -259,7 +258,7 @@ private slots:
                       "Something broke with the wrapping of object lists into lists of ObjectHandles...");
 
         for (auto x : w->children()) {
-            QCOMPARE(x->parent()->m_control, w->m_control);
+            QCOMPARE(x->parent()->d, w->d);
             QCOMPARE(x->x(), x.object()->x());
             QCOMPARE(x->y(), x.object()->y());
             QCOMPARE(x->str(), x.object()->str());
@@ -270,14 +269,14 @@ private slots:
 
     void testCleanup()
     {
-        ObjectShadowDataRepository::instance()->m_objectToWrapperControlBlockMap.clear();
+        ObjectShadowDataRepository::instance()->m_objectToWrapperPrivateMap.clear();
         {
             QObjectTestObject t;
             t.m_children = QVector<QObjectTestObject *> { new QObjectTestObject {1, 2, &t}, new QObjectTestObject {3, 4, &t} };
             ObjectHandle<QObjectTestObject> w { &t };
-            QCOMPARE(ObjectShadowDataRepository::instance()->m_objectToWrapperControlBlockMap.size(), 6); // test object with two children, every test object has a qtimer-child.
+            QCOMPARE(ObjectShadowDataRepository::instance()->m_objectToWrapperPrivateMap.size(), 6); // test object with two children, every test object has a qtimer-child.
         }
-        QCOMPARE(ObjectShadowDataRepository::instance()->m_objectToWrapperControlBlockMap.size(), 0);
+        QCOMPARE(ObjectShadowDataRepository::instance()->m_objectToWrapperPrivateMap.size(), 0);
     }
 
 // SKIP: This feature has been removed. It's now simply forbidden (and asserted) to create an ObjectHandle from the wrong thread.
@@ -287,7 +286,7 @@ private slots:
 // //         task->setAutoDelete(false);
 // //         QThreadPool::globalInstance()->start(task.get());
 //
-//         ObjectShadowDataRepository::instance()->m_objectToWrapperControlBlockMap.clear(); // FIXME this should not be necessary!
+//         ObjectShadowDataRepository::instance()->m_objectToWrapperPrivateMap.clear(); // FIXME this should not be necessary!
 //         QThread workerThread;
 //         workerThread.start();
 //         QObjectTestObject t;
@@ -316,7 +315,7 @@ private slots:
 //                       "Something broke with the wrapping of object lists into lists of ObjectHandles...");
 //
 //         for (auto x : w->children()) {
-//             QCOMPARE(x->parent()->m_control, w->m_control);
+//             QCOMPARE(x->parent()->d, w->d);
 //             QCOMPARE(x->x(), x.object()->x());
 //             QCOMPARE(x->y(), x.object()->y());
 //             QCOMPARE(x->str(), x.object()->str());
@@ -330,27 +329,27 @@ private slots:
 
     void testSelfReference()
     {
-        ObjectShadowDataRepository::instance()->m_objectToWrapperControlBlockMap.clear();
+        ObjectShadowDataRepository::instance()->m_objectToWrapperPrivateMap.clear();
         {
             LinkedList ll { 5, new LinkedList(6) };
             ObjectHandle<LinkedList> l { &ll };
 
-            QCOMPARE(ObjectShadowDataRepository::instance()->m_objectToWrapperControlBlockMap.size(), 2);
+            QCOMPARE(ObjectShadowDataRepository::instance()->m_objectToWrapperPrivateMap.size(), 2);
 
             QVERIFY(l->object);
-            QVERIFY(l->m_control);
+            QVERIFY(l->d);
             QVERIFY(ll.next()->prev());
-            QVERIFY(l->next()->m_control != l->m_control);
+            QVERIFY(l->next()->d != l->d);
             QVERIFY(l->next()->object);
             QVERIFY(l->next()->prev()->object);
-            QCOMPARE(l->next()->prev()->m_control, l->m_control);
+            QCOMPARE(l->next()->prev()->d, l->d);
             QCOMPARE(l->next()->i(), ll.next()->i());
             QCOMPARE(l->next()->prev()->i(), ll.i());
             QCOMPARE(l->next()->prev()->next()->i(), ll.next()->i());
             QCOMPARE(l->next()->prev()->next()->prev()->i(), ll.i());
             QCOMPARE(l->next()->prev()->next()->prev()->next()->i(), ll.next()->i());
         }
-        QCOMPARE(ObjectShadowDataRepository::instance()->m_objectToWrapperControlBlockMap.size(), 0);
+        QCOMPARE(ObjectShadowDataRepository::instance()->m_objectToWrapperPrivateMap.size(), 0);
     }
 
     void testMoveHandle()
@@ -397,6 +396,9 @@ private slots:
     {
         DisabledCachingTestObject t;
         ObjectHandle<DisabledCachingTestObject> w { &t };
+
+        static_assert(cachingDisabled<ObjectWrapper<DisabledCachingTestObject>>::value,
+                      "cachingDisabled is not reported for test object.");
 
         QCOMPARE(t.m_callCount, 0);
         QCOMPARE(w->x(), 42);
