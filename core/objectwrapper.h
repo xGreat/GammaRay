@@ -510,16 +510,7 @@ protected: \
 }; \
 Q_DECLARE_METATYPE(GammaRay::ObjectWrapper<Class>) \
 Q_DECLARE_METATYPE(GammaRay::ObjectHandle<Class>) \
-Q_DECLARE_METATYPE(GammaRay::WeakObjectHandle<Class>)
-    } \
-    friend class ObjectWrapperBase; \
-    friend class ObjectWrapperTest; \
-    friend class ObjectHandle<Class>; \
-    std::shared_ptr<ControlData> m_control; \
-}; \
-Q_DECLARE_METATYPE(GammaRay::ObjectWrapper<Class>) \
-Q_DECLARE_METATYPE(GammaRay::ObjectHandle<Class>) \
-Q_DECLARE_METATYPE(GammaRay::WeakObjectHandle<Class>) \
+Q_DECLARE_METATYPE(GammaRay::ObjectView<Class>) \
 
 
 
@@ -618,18 +609,18 @@ private:
 };
 
 template<typename T>
-class WeakObjectHandle
+class ObjectView
 {
 public:
-    explicit WeakObjectHandle() = default;
-    explicit WeakObjectHandle(std::weak_ptr<typename ObjectWrapper<T>::Private> controlBlock);
+    explicit ObjectView() = default;
+    explicit ObjectView(std::weak_ptr<typename ObjectWrapper<T>::Private> controlBlock);
     explicit operator bool() const;
 
-    static WeakObjectHandle nullhandle();
+    static ObjectView nullhandle();
 
     inline ObjectHandle<T> lock() const;
 
-    // TODO: Do we actually want implicit locking for WeakObjectHandle?
+    // TODO: Do we actually want implicit locking for ObjectView? (Yes, we do!)
     inline const ObjectHandle<T> operator->() const;
     inline const ObjectWrapper<T> &operator*() const;
     inline ObjectWrapper<T> &operator*();
@@ -649,7 +640,7 @@ public:
     static ObjectHandle<Class> handleForObject(Class *obj);
 
     template<typename Class>
-    static WeakObjectHandle<Class> weakHandleForObject(Class *obj);
+    static ObjectView<Class> viewForObject(Class *obj);
 
 private:
     explicit ObjectShadowDataRepository() = default;
@@ -868,50 +859,50 @@ MetaObject *ObjectHandle<T>::staticMetaObject()
     return decltype(m_objectWrapper)::staticMetaObject();
 }
 
-// === WeakObjectHandle ===
+// === ObjectView ===
 
 template<typename T>
-WeakObjectHandle<T>::WeakObjectHandle(std::weak_ptr<typename ObjectWrapper<T>::Private> controlBlock)
+ObjectView<T>::ObjectView(std::weak_ptr<typename ObjectWrapper<T>::Private> controlBlock)
 : d(std::move(controlBlock))
 {}
 
 template<typename T>
-WeakObjectHandle<T>::operator bool() const
+ObjectView<T>::operator bool() const
 {
     return !d.expired() && Probe::instance()->isValidObject(d.lock()->object); // FIXME we should not need to lock this just to do a null check
 }
 
 template<typename T>
-ObjectHandle<T> WeakObjectHandle<T>::lock() const
+ObjectHandle<T> ObjectView<T>::lock() const
 {
     return ObjectHandle<T> { d.lock() };
 }
 template<typename T>
-WeakObjectHandle<T> WeakObjectHandle<T>::nullhandle()
+ObjectView<T> ObjectView<T>::nullhandle()
 {
-    return WeakObjectHandle<T> { std::weak_ptr<typename ObjectWrapper<T>::Private>{} };
+    return ObjectView<T> { std::weak_ptr<typename ObjectWrapper<T>::Private>{} };
 }
 
 template<typename T>
-const ObjectHandle<T> WeakObjectHandle<T>::operator->() const
+const ObjectHandle<T> ObjectView<T>::operator->() const
 {
     return lock();
 }
 
 template<typename T>
-const ObjectWrapper<T> &WeakObjectHandle<T>::operator*() const
+const ObjectWrapper<T> &ObjectView<T>::operator*() const
 {
     return *lock();
 }
 
 template<typename T>
-ObjectWrapper<T> &WeakObjectHandle<T>::operator*()
+ObjectWrapper<T> &ObjectView<T>::operator*()
 {
     return *lock();
 }
 
 template<typename T>
-T *WeakObjectHandle<T>::object() const
+T *ObjectView<T>::object() const
 {
     return d.lock()->object;
 }
@@ -940,20 +931,20 @@ ObjectHandle<Class> ObjectShadowDataRepository::handleForObject(Class *obj)
 }
 
 template<typename Class>
-WeakObjectHandle<Class> ObjectShadowDataRepository::weakHandleForObject(Class *obj)
+ObjectView<Class> ObjectShadowDataRepository::viewForObject(Class *obj)
 {
     if (!obj) {
-        return WeakObjectHandle<Class> {};
+        return ObjectView<Class> {};
     }
 
     auto self = instance();
 
-    Q_ASSERT_X(self->m_objectToWrapperPrivateMap.contains(obj), "weakHandleForObject", "Obtaining a weak handle requires a (strong) handle to already exist.");
+    Q_ASSERT_X(self->m_objectToWrapperPrivateMap.contains(obj), "viewForObject", "Obtaining a weak handle requires a (strong) handle to already exist.");
 
     auto controlBasePtr = self->m_objectToWrapperPrivateMap.value(obj).lock();
     std::weak_ptr<typename ObjectWrapper<Class>::Private> controlPtr =
         std::static_pointer_cast<typename ObjectWrapper<Class>::Private>(controlBasePtr);
-    return WeakObjectHandle<Class> { std::move(controlPtr) };
+    return ObjectView<Class> { std::move(controlPtr) };
 }
 
 template<typename Class>
@@ -986,9 +977,9 @@ auto wrap(T &&value) -> typename std::enable_if<!isSpecialized<ObjectWrapper<T>>
     return std::forward<T>(value);
 }
 template<int flags, typename T>
-auto wrap(T *object) -> second_t<typename ObjectWrapper<T>::value_type, typename std::enable_if<flags & NonOwningPointer, WeakObjectHandle<T>>::type>
+auto wrap(T *object) -> second_t<typename ObjectWrapper<T>::value_type, typename std::enable_if<flags & NonOwningPointer, ObjectView<T>>::type>
 {
-    return ObjectShadowDataRepository::weakHandleForObject(object);
+    return ObjectShadowDataRepository::viewForObject(object);
 }
 template<int flags, typename T>
 auto wrap(T *object) -> second_t<typename ObjectWrapper<T>::value_type, typename std::enable_if<flags & OwningPointer, ObjectHandle<T>>::type>
@@ -996,21 +987,21 @@ auto wrap(T *object) -> second_t<typename ObjectWrapper<T>::value_type, typename
     return ObjectShadowDataRepository::handleForObject(object);
 }
 template<int flags, typename T>
-auto wrap(const QList<T*> &list) -> second_t<typename ObjectWrapper<T>::value_type, QList<WeakObjectHandle<T>>>
+auto wrap(const QList<T*> &list) -> second_t<typename ObjectWrapper<T>::value_type, QList<ObjectView<T>>>
 {
-    QList<WeakObjectHandle<T>> handleList;
-    std::transform(list.cBegin(), list.cEnd(), handleList.begin(), [](T *t) { return ObjectShadowDataRepository::weakHandleForObject(t); });
+    QList<ObjectView<T>> handleList;
+    std::transform(list.cBegin(), list.cEnd(), handleList.begin(), [](T *t) { return ObjectShadowDataRepository::viewForObject(t); });
     return handleList;
 }
 template<int flags, typename T>
-auto wrap(QVector<T*> list) -> second_t<typename ObjectWrapper<T>::value_type, typename std::enable_if<flags & NonOwningPointer, QVector<WeakObjectHandle<T>>>::type>
+auto wrap(QVector<T*> list) -> second_t<typename ObjectWrapper<T>::value_type, typename std::enable_if<flags & NonOwningPointer, QVector<ObjectView<T>>>::type>
 {
-    QVector<WeakObjectHandle<T>> handleList;
+    QVector<ObjectView<T>> handleList;
     handleList.reserve(list.size());
     for (T *t : qAsConst(list)) {
-        handleList.push_back(ObjectShadowDataRepository::weakHandleForObject(t));
+        handleList.push_back(ObjectShadowDataRepository::viewForObject(t));
     }
-    //     std::transform(list.cbegin(), list.cend(), handleList.begin(), [](T *t) { return WeakObjectHandle<T> { t }; });
+    //     std::transform(list.cbegin(), list.cend(), handleList.begin(), [](T *t) { return ObjectView<T> { t }; });
     return handleList;
 }
 template<int flags, typename T>
@@ -1033,5 +1024,7 @@ auto wrap(QVector<T*> list) -> second_t<typename ObjectWrapper<T>::value_type, t
 //TODO: Check threading
 
 // TODO: Look at Event-monitor, lazy-properties, look at Bindings und Signal-Slot connections
+
+// TODO: Do we actually need shared_ptr + weak_ptr or is unique_ptr + raw pointer enough?
 
 #endif // GAMMARAY_OBJECTHANDLE_H
