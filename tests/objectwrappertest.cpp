@@ -336,12 +336,12 @@ private slots:
 
             QCOMPARE(ObjectShadowDataRepository::instance()->m_objectToWrapperPrivateMap.size(), 2);
 
-            QVERIFY(l->object);
+            QVERIFY(l.object());
             QVERIFY(l->d);
             QVERIFY(ll.next()->prev());
             QVERIFY(l->next()->d != l->d);
-            QVERIFY(l->next()->object);
-            QVERIFY(l->next()->prev()->object);
+            QVERIFY(l->next().object());
+            QVERIFY(l->next()->prev().object());
             QCOMPARE(l->next()->prev()->d, l->d);
             QCOMPARE(l->next()->i(), ll.next()->i());
             QCOMPARE(l->next()->prev()->i(), ll.i());

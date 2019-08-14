@@ -418,22 +418,22 @@ ADD_TO_METAOBJECT(FieldName, decltype(fetch_##FieldName<Flags | CustomCommand>(s
 
 
 #define DIRECT_ACCESS_METHOD(MethodName) \
-template<typename ...Args> auto MethodName(Args &&...args) -> decltype(object->MethodName(args...)) \
+template<typename ...Args> auto MethodName(Args &&...args) -> decltype(d->object->MethodName(args...)) \
 { \
-    return object->MethodName(args...); \
+    return d->object->MethodName(args...); \
 } \
 
 
 #define BLOCKING_ASYNC_METHOD(MethodName) \
-template<typename ...Args> auto MethodName(Args &&...args) -> decltype(object->MethodName(args...)) \
+template<typename ...Args> auto MethodName(Args &&...args) -> decltype(d->object->MethodName(args...)) \
 { \
-    return call(object, &value_type::MethodName, args...).get(); \
+    return call(d->object, &value_type::MethodName, args...).get(); \
 } \
 
 #define ASYNC_VOID_METHOD(MethodName) \
 template<typename ...Args> void MethodName(Args &&...args) \
 { \
-    call(object, &value_type::MethodName, args...); \
+    call(d->object, &value_type::MethodName, args...); \
 } \
 
 /**
@@ -461,8 +461,7 @@ public: \
     } \
  \
     explicit ObjectWrapper<Class>(std::shared_ptr<Private> controlBlock) \
-        : object(controlBlock->object) \
-        , d(std::move(controlBlock)) \
+        : d(std::move(controlBlock)) \
     {} \
     explicit ObjectWrapper<Class>() = default; \
  \
@@ -493,17 +492,13 @@ private: \
 template<> \
 class GammaRay::ObjectWrapper<Class> \
 { \
-private: \
-    Class *object = nullptr; \
- \
 public: \
     static std::tuple<> __data(ObjectWrapperPrivate<Class> *, __number<0>) { return {}; } \
     static void __metadata(__number<0>, MetaObject *) {} \
     static void __connectToUpdates(ObjectWrapperPrivate<Class> *, __number<0>) {} \
  \
     explicit ObjectWrapper<Class>(Class *object) \
-    : object(object) \
-    , d(ObjectWrapperPrivate<Class>::create(object)) \
+    : d(ObjectWrapperPrivate<Class>::create(object)) \
     { \
         d->initialize(); \
     } \
@@ -793,13 +788,13 @@ ObjectHandle<T>::ObjectHandle(std::shared_ptr<typename ObjectWrapper<T>::Private
 template<typename T>
 ObjectHandle<T>::operator bool() const
 {
-    return Probe::instance()->isValidObject(m_objectWrapper->object);
+    return Probe::instance()->isValidObject(m_objectWrapper.d->object);
 }
 
 template<typename T>
 ObjectHandle<T>::operator T*() const
 {
-    return m_objectWrapper->object;
+    return m_objectWrapper.d->object;
 }
 
 template<typename T>
@@ -829,12 +824,12 @@ ObjectWrapper<T> &ObjectHandle<T>::operator*()
 template<typename T>
 T *ObjectHandle<T>::object() const
 {
-    return m_objectWrapper.object;
+    return m_objectWrapper.d->object;
 }
 template<typename T>
 T *ObjectHandle<T>::data() const
 {
-    return m_objectWrapper.object;
+    return m_objectWrapper.d->object;
 }
 
 
@@ -843,17 +838,17 @@ template<typename T>
 template<typename Func, typename ...Args>
 auto ObjectHandle<T>::call(Func &&f, Args &&...args) -> std::future<decltype(std::declval<T*>()->*f(args...))>
 {
-    if (!Probe::instance()->isValidObject(m_objectWrapper->object)) {
+    if (!Probe::instance()->isValidObject(m_objectWrapper.d->object)) {
         return {};
     }
 
-    std::promise<decltype(m_objectWrapper->object->*f(args...))> p;
+    std::promise<decltype(m_objectWrapper.d->object->*f(args...))> p;
     auto future = p.get_future();
-    if (m_objectWrapper->object->thread == QThread::currentThread()) {
-        p.set_value(m_objectWrapper->object->*f(args...));
+    if (m_objectWrapper.d->object->thread == QThread::currentThread()) {
+        p.set_value(m_objectWrapper.d->object->*f(args...));
     } else {
         T *ptr = m_objectWrapper->object;
-        QMetaObject::invokeMethod(m_objectWrapper->object, [p, ptr, f, args...]() {
+        QMetaObject::invokeMethod(m_objectWrapper.d->object, [p, ptr, f, args...]() {
             p.set_value(ptr->*f(args...));
         }, Qt::QueuedConnection);
     }
@@ -1026,8 +1021,10 @@ auto wrap(QVector<T*> list) -> second_t<typename ObjectWrapper<T>::value_type, t
     for (T *t : qAsConst(list)) {
         handleList.push_back(ObjectShadowDataRepository::handleForObject(t));
     }
-    //     std::transform(list.cbegin(), list.cend(), handleList.begin(), [](T *t) { return WeakObjectHandle<T> { t }; });
+    //     std::transform(list.cbegin(), list.cend(), handleList.begin(), [](T *t) { return ObjectView<T> { t }; });
     return handleList;
+}
+
 }
 
 
