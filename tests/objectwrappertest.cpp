@@ -59,6 +59,20 @@ private:
     int m_x;
 };
 
+class DerivedTestObject : SimpleNonQObjectTestObject
+{
+public:
+    explicit DerivedTestObject(int x, int y, int z)
+        : SimpleNonQObjectTestObject{x, y}, m_z{z}
+    {}
+
+    int z() const { return m_z; }
+
+private:
+    int m_z;
+
+};
+
 // class Foo {
 //
 //
@@ -213,6 +227,9 @@ DECLARE_OBJECT_WRAPPER(DisabledCachingTestObject,
                        DISABLE_CACHING
                        RO_PROP(x, Getter)
 )
+// DECLARE_OBJECT_WRAPPER_WB(DerivedTestObject, SimpleNonQObjectTestObject,
+//                        RO_PROP(z, Getter)
+// )
 namespace GammaRay {
 
 class ObjectWrapperTest : public BaseProbeTest
@@ -233,7 +250,7 @@ private slots:
     {
         QObjectTestObject t;
         t.m_children = QVector<QObjectTestObject *> { new QObjectTestObject {1, 2, &t}, new QObjectTestObject {3, 4, &t} };
-        ObjectHandle<QObjectTestObject> w { &t };
+        ObjectHandle<QObjectTestObject> w = ObjectShadowDataRepository::handleForObject(&t);
         //     error<decltype(w->children())>();
 
 
@@ -273,7 +290,7 @@ private slots:
         {
             QObjectTestObject t;
             t.m_children = QVector<QObjectTestObject *> { new QObjectTestObject {1, 2, &t}, new QObjectTestObject {3, 4, &t} };
-            ObjectHandle<QObjectTestObject> w { &t };
+            ObjectHandle<QObjectTestObject> w = ObjectShadowDataRepository::handleForObject(&t);
             QCOMPARE(ObjectShadowDataRepository::instance()->m_objectToWrapperPrivateMap.size(), 6); // test object with two children, every test object has a qtimer-child.
         }
         QCOMPARE(ObjectShadowDataRepository::instance()->m_objectToWrapperPrivateMap.size(), 0);
@@ -332,7 +349,7 @@ private slots:
         ObjectShadowDataRepository::instance()->m_objectToWrapperPrivateMap.clear();
         {
             LinkedList ll { 5, new LinkedList(6) };
-            ObjectHandle<LinkedList> l { &ll };
+            ObjectHandle<LinkedList> l = ObjectShadowDataRepository::handleForObject(&ll);
 
             QCOMPARE(ObjectShadowDataRepository::instance()->m_objectToWrapperPrivateMap.size(), 2);
 
@@ -355,9 +372,12 @@ private slots:
     void testMoveHandle()
     {
         QObjectTestObject t;
-        auto wptr = new ObjectHandle<QObjectTestObject> { &t };
-        ObjectHandle<QObjectTestObject> w = *wptr; // copy
-        delete wptr;
+        ObjectHandle<QObjectTestObject> w;
+
+        {
+            auto wptr = ObjectShadowDataRepository::handleForObject(&t); // FIXME was `new ObjectHandle<QObjectTestObject> {&t}`. Is the test still correct?
+            w = wptr; // copy
+        } // delete wptr
 
         QCOMPARE(w->x(), t.x());
         QCOMPARE(w->y(), t.y());
@@ -378,7 +398,7 @@ private slots:
     void testNonQObject()
     {
         SimpleNonQObjectTestObject t {1, 2};
-        ObjectHandle<SimpleNonQObjectTestObject> w { &t };
+        ObjectHandle<SimpleNonQObjectTestObject> w = ObjectShadowDataRepository::handleForObject(&t);
 
         QCOMPARE(w->x(), t.x());
         QCOMPARE(w->y(), t.y);
@@ -395,7 +415,7 @@ private slots:
     void testCachingDisabled()
     {
         DisabledCachingTestObject t;
-        ObjectHandle<DisabledCachingTestObject> w { &t };
+        ObjectHandle<DisabledCachingTestObject> w = ObjectShadowDataRepository::handleForObject(&t);
 
         static_assert(cachingDisabled<ObjectWrapper<DisabledCachingTestObject>>::value,
                       "cachingDisabled is not reported for test object.");
@@ -412,7 +432,7 @@ private slots:
     void testMetaObject()
     {
         SimpleNonQObjectTestObject t {1, 2};
-        ObjectHandle<SimpleNonQObjectTestObject> w { &t };
+        ObjectHandle<SimpleNonQObjectTestObject> w = ObjectShadowDataRepository::handleForObject(&t);
         auto mo = ObjectHandle<SimpleNonQObjectTestObject>::staticMetaObject();
 
         QCOMPARE(mo->className(), QStringLiteral("SimpleNonQObjectTestObject"));
@@ -438,13 +458,24 @@ private slots:
     void testWriting()
     {
         SimpleNonQObjectTestObject t {1, 2};
-        ObjectHandle<SimpleNonQObjectTestObject> w { &t };
+        ObjectHandle<SimpleNonQObjectTestObject> w = ObjectShadowDataRepository::handleForObject(&t);
 
         QCOMPARE(w->y(), t.y);
         w->setY(20);
         QCOMPARE(w->y(), 20);
         QCOMPARE(w->y(), t.y);
     }
+
+
+//     void testInheritance()
+//     {
+//         DerivedTestObject t {1, 2, 3};
+//         ObjectHandle<DerivedTestObject> w { &t };
+//
+//         QCOMPARE(w->x(), t.x());
+//         QCOMPARE(w->y(), t.y);
+//         QCOMPARE(w->z(), t.z());
+//     }
 };
 
 }
