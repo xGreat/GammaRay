@@ -467,7 +467,7 @@ private slots:
     }
 
 
-//     void testInheritance()
+//     void testSingleInheritance()
 //     {
 //         DerivedTestObject t {1, 2, 3};
 //         ObjectHandle<DerivedTestObject> w { &t };
@@ -475,6 +475,11 @@ private slots:
 //         QCOMPARE(w->x(), t.x());
 //         QCOMPARE(w->y(), t.y);
 //         QCOMPARE(w->z(), t.z());
+//
+// //         ObjectHandle<SimpleNonQObjectTestObject> v = w;
+//
+// //         QCOMPARE(w->x(), t.x());
+// //         QCOMPARE(w->y(), t.y);
 //     }
 };
 

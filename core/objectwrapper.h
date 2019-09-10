@@ -456,7 +456,7 @@ public: \
     __VA_ARGS__; \
  \
     static MetaObject *staticMetaObject() { \
-        static auto mo = createStaticMetaObject(); \
+        static auto mo = PropertyCache_t::createStaticMetaObject(QStringLiteral(#Class)); \
         return mo.get(); \
     } \
  \
@@ -466,12 +466,6 @@ public: \
     explicit ObjectWrapper<Class>() = default; \
  \
 private: \
-    static std::unique_ptr<MetaObject> createStaticMetaObject() { \
-        auto mo = new MetaObjectImpl<Class>; \
-        mo->setClassName(QStringLiteral(#Class)); \
-        __metadata(__number<255>(), mo); \
-        return std::unique_ptr<MetaObject>{mo}; \
-    } \
     friend class ObjectWrapperTest; \
     friend class PropertyCache<Class>; \
     friend class ObjectHandle<Class>; \
@@ -532,13 +526,14 @@ template<> \
 class GammaRay::ObjectWrapper<Class> : public GammaRay::ObjectWrapper<BaseClass> \
 { \
 protected: \
-    /* We hide the base classes __data function on purpose and start counting at 0 again. */ \
-    static std::tuple<> __data(PropertyCache<Class> *, __number<0>) { return {}; } \
+    /* We hide the base classes __data and __metadata functions on purpose and start counting at 0 again. */ \
+    static std::tuple<> __data(ObjectWrapperPrivate *, __number<0>) { return {}; } \
+    static void __metadata(__number<0>, MetaObject *) {} \
     \
 public: \
-    using PropertyCache = PropertyCache<Class, BaseClass>; \
+    using PropertyCache_t = PropertyCache<Class, BaseClass>; \
     \
-    Class *object() \
+    Class *object() const \
     { \
         return d->object<Class>(); \
     } \
@@ -605,7 +600,8 @@ class ObjectWrapperPrivate;
 template<typename Class, typename ...BaseClasses>
 struct PropertyCache final : PropertyCacheBase
 {
-    using Data_t = decltype( ObjectWrapper<Class>::__data(static_cast<ObjectWrapperPrivate*>(nullptr), __number<255>()) );
+    using ObjectWrapper_t = ObjectWrapper<Class>;
+    using Data_t = decltype( ObjectWrapper_t::__data(static_cast<ObjectWrapperPrivate*>(nullptr), __number<255>()) );
     using value_type = Class;
 
     Data_t dataStorage;
