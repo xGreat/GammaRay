@@ -613,12 +613,9 @@ struct PropertyCache final : PropertyCacheBase
 
     ~PropertyCache() override = default;
 
-    explicit PropertyCache(ObjectWrapperPrivate *d)
-        : m_baseCaches(make_unique<PropertyCache<BaseClasses>>(d)...)
+    explicit PropertyCache()
+        : m_baseCaches(make_unique<PropertyCache<BaseClasses>>()...)
     {
-        IF_CONSTEXPR (!cachingDisabled<ObjectWrapper<Class>>::value) {
-            update(d);
-        }
     }
 
     PropertyCacheBase *cache(std::type_index type) override
@@ -716,8 +713,9 @@ public:
         return reinterpret_cast<T*>(m_cache->castObject(m_object, typeid(PropertyCache<T>)));
     }
 
-    explicit ObjectWrapperPrivate(void *object)
+    explicit ObjectWrapperPrivate(void *object, std::unique_ptr<PropertyCacheBase> cache)
     : m_object(object)
+    , m_cache(std::move(cache))
     {}
 
     inline ~ObjectWrapperPrivate();
@@ -858,9 +856,8 @@ std::shared_ptr<ObjectWrapperPrivate> ObjectWrapperPrivate::create(Class *object
     // guard the access with a semaphore. Also we're in object's thread, so we don't need to guard
     // against asynchronous deletions of object.
 
-    auto d = std::make_shared<ObjectWrapperPrivate>(object);
-    auto cache = make_unique<typename ObjectWrapper<Class>::PropertyCache_t>(d.get()); // recursively creates all subclasses' caches
-    d->m_cache = std::move(cache);
+    auto cache = make_unique<typename ObjectWrapper<Class>::PropertyCache_t>(); // recursively creates all subclasses' caches
+    auto d = std::make_shared<ObjectWrapperPrivate>(object, std::move(cache));
     ObjectWrapper<Class>::__connectToUpdates(d.get(), __number<255>{});
 
     return d;
@@ -1076,6 +1073,10 @@ ObjectShadowDataRepository *ObjectShadowDataRepository::instance()
 template<typename Class>
 ObjectHandle<Class> ObjectShadowDataRepository::handleForObject(Class *obj)
 {
+    if (!obj) {
+        return ObjectHandle<Class>{};
+    }
+
     auto self = instance();
     std::shared_ptr<ObjectWrapperPrivate> d {};
 
@@ -1084,6 +1085,10 @@ ObjectHandle<Class> ObjectShadowDataRepository::handleForObject(Class *obj)
     } else {
         d = ObjectWrapperPrivate::create(obj);
         self->m_objectToWrapperPrivateMap.insert(obj, std::weak_ptr<ObjectWrapperPrivate> { d });
+
+        IF_CONSTEXPR (!cachingDisabled<ObjectWrapper<Class>>::value) {
+            d->cache<Class>()->update(d.get());
+        }
     }
 
     return ObjectHandle<Class> { std::move(d) };
