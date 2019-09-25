@@ -91,13 +91,13 @@ enum ObjectWrapperFlag {
 #define DEFINE_GETTER(FieldName, StorageIndex, Flags) \
 decltype(fetch_##FieldName<Flags>(static_cast<value_type*>(nullptr))) FieldName() const \
 { \
-    d->semaphore.acquire(); \
-    QSemaphoreReleaser releaser { &d->semaphore }; \
+    d_ptr()->semaphore.acquire(); \
+    QSemaphoreReleaser releaser { &d_ptr()->semaphore }; \
  \
     IF_CONSTEXPR (cachingDisabled<ThisClass_t>::value) { \
         return fetch_##FieldName<Flags>(object()); \
     } else { \
-        return d->cache<value_type>()->get< StorageIndex >(); \
+        return d_ptr()->cache<value_type>()->get< StorageIndex >(); \
     } \
 } \
 
@@ -112,13 +112,13 @@ decltype(fetch_##FieldName<Flags>(static_cast<value_type*>(nullptr))) FieldName(
 #define DEFINE_SETTER(FieldName, SetterName, StorageIndex, Flags) \
 void SetterName(decltype(fetch_##FieldName<Flags>(static_cast<value_type*>(nullptr))) newValue) \
 { \
-    d->semaphore.acquire(); \
-    QSemaphoreReleaser releaser { &d->semaphore }; \
+    d_ptr()->semaphore.acquire(); \
+    QSemaphoreReleaser releaser { &d_ptr()->semaphore }; \
     \
     IF_CONSTEXPR (cachingDisabled<ThisClass_t>::value) { \
         write_##FieldName<Flags>(object(), newValue); \
     } else { \
-        d->cache<value_type>()->get< StorageIndex >() = newValue; \
+        d_ptr()->cache<value_type>()->get< StorageIndex >() = newValue; \
         /* TODO Defer calling the setter */ \
         write_##FieldName<Flags>(object(), newValue); \
     } \
@@ -460,14 +460,10 @@ public: \
         return mo.get(); \
     } \
  \
-    explicit ObjectWrapper<Class>(std::shared_ptr<ObjectWrapperPrivate> controlBlock) \
-        : d(std::move(controlBlock)) \
-    {} \
     explicit ObjectWrapper<Class>() = default; \
  \
 private: \
     friend class ObjectWrapperTest; \
-    friend class PropertyCache<Class>; \
     friend class ObjectHandle<Class>; \
 
 
@@ -500,7 +496,13 @@ protected: \
 public: \
     using PropertyCache_t = PropertyCache<Class>; \
  \
+    explicit ObjectWrapper<Class>(std::shared_ptr<ObjectWrapperPrivate> controlBlock) \
+    : d(std::move(controlBlock)) \
+    {} \
+ \
     OBJECT_WRAPPER_COMMON(Class, __VA_ARGS__) \
+ \
+ ObjectWrapperPrivate *d_ptr() const { return d.get(); } \
  \
 protected: \
     std::shared_ptr<ObjectWrapperPrivate> d; \
@@ -529,9 +531,14 @@ protected: \
     /* We hide the base classes __data and __metadata functions on purpose and start counting at 0 again. */ \
     static std::tuple<> __data(ObjectWrapperPrivate *, __number<0>) { return {}; } \
     static void __metadata(__number<0>, MetaObject *) {} \
+    static void __connectToUpdates(ObjectWrapperPrivate * d, __number<0>) { ObjectWrapper<BaseClass>::__connectToUpdates(d, __number<255>{}); } \
     \
 public: \
     using PropertyCache_t = PropertyCache<Class, BaseClass>; \
+    \
+    explicit ObjectWrapper<Class>(std::shared_ptr<ObjectWrapperPrivate> controlBlock) \
+        : ObjectWrapper<BaseClass>(std::move(controlBlock)) \
+    {} \
     \
     Class *object() const \
     { \
@@ -539,6 +546,56 @@ public: \
     } \
  \
     OBJECT_WRAPPER_COMMON(Class, __VA_ARGS__) \
+ \
+private: \
+    ObjectWrapperPrivate *d_ptr() const { return d.get(); } \
+}; \
+Q_DECLARE_METATYPE(GammaRay::ObjectWrapper<Class>) \
+Q_DECLARE_METATYPE(GammaRay::ObjectHandle<Class>) \
+Q_DECLARE_METATYPE(GammaRay::ObjectView<Class>)
+
+/**
+ * Defines a specialization of the dummy ObjectWrapper class template for
+ * \p Class. This is the main macro for enabling wrapping capabilities for a
+ * given class.
+ *
+ * This macro has three arguments. The first one is the name of the class to be
+ * wrapped. The second argument is a (the) base class of \p Class, which already
+ * has a wrapper class defined. The third argument is a free-form area that can
+ * be used to put arbitrary content into the wrapper class. Its mostly meant,
+ * though, to put PROP and CUSTOM_PROP macros in there, which define properties,
+ * the wrapper will have. Also put DISABLE_CACHING here, if desired.
+ */
+#define DECLARE_OBJECT_WRAPPER_WB2(Class, BaseClass1, BaseClass2, ...) \
+template<> \
+class GammaRay::ObjectWrapper<Class> : public GammaRay::ObjectWrapper<BaseClass1>, public GammaRay::ObjectWrapper<BaseClass2> \
+{ \
+    protected: \
+        /* We hide the base classes __data and __metadata functions on purpose and start counting at 0 again. */ \
+        static std::tuple<> __data(ObjectWrapperPrivate *, __number<0>) { return {}; } \
+        static void __metadata(__number<0>, MetaObject *) {} \
+        static void __connectToUpdates(ObjectWrapperPrivate * d, __number<0>) { \
+            ObjectWrapper<BaseClass1>::__connectToUpdates(d, __number<255>{}); \
+            ObjectWrapper<BaseClass2>::__connectToUpdates(d, __number<255>{}); \
+        } \
+        \
+        public: \
+            using PropertyCache_t = PropertyCache<Class, BaseClass1, BaseClass2>; \
+            \
+            explicit ObjectWrapper<Class>(std::shared_ptr<ObjectWrapperPrivate> controlBlock) \
+            : ObjectWrapper<BaseClass1>(controlBlock) \
+            , ObjectWrapper<BaseClass2>(std::move(controlBlock)) \
+            {} \
+            \
+            Class *object() const \
+            { \
+                return d_ptr()->object<Class>(); \
+            } \
+            \
+            OBJECT_WRAPPER_COMMON(Class, __VA_ARGS__) \
+ \
+private: \
+    ObjectWrapperPrivate *d_ptr() const { return ObjectWrapper<BaseClass1>::d.get(); } \
 }; \
 Q_DECLARE_METATYPE(GammaRay::ObjectWrapper<Class>) \
 Q_DECLARE_METATYPE(GammaRay::ObjectHandle<Class>) \
@@ -580,6 +637,9 @@ template<typename Wrapper>
 struct isSpecialized<Wrapper, void_t<typename Wrapper::ThisClass_t>>
  : public std::true_type {};
 
+template<typename T>
+using propertyCache_t = typename ObjectWrapper<T>::PropertyCache_t;
+
 struct PropertyCacheBase
 {
     virtual ~PropertyCacheBase() = default;
@@ -605,12 +665,12 @@ struct PropertyCache final : PropertyCacheBase
     using value_type = Class;
 
     Data_t dataStorage;
-    std::tuple<std::unique_ptr<PropertyCache<BaseClasses>>...> m_baseCaches;
+    std::tuple<std::unique_ptr<propertyCache_t<BaseClasses>>...> m_baseCaches;
 
     ~PropertyCache() override = default;
 
     explicit PropertyCache()
-        : m_baseCaches(make_unique<PropertyCache<BaseClasses>>()...)
+        : m_baseCaches(make_unique<propertyCache_t<BaseClasses>>()...)
     {
     }
 
@@ -620,16 +680,16 @@ struct PropertyCache final : PropertyCacheBase
             return this;
         }
 
-        return getCacheFromBases(TemplateParamList<BaseClasses...>{}, type);
+        return getCacheFromBases(TemplateParamList<BaseClasses...>{}, type); // C++17: Use fold expression
     }
 
     void *castObject(void *object, std::type_index type) override
     {
         if (std::type_index { typeid(decltype(*this)) } == type) {
-            return reinterpret_cast<Class*>(object);
+            return object;
         }
 
-        return castObjectFromBases(TemplateParamList<BaseClasses...>{}, object, type);
+        return castObjectFromBases(TemplateParamList<BaseClasses...>{}, reinterpret_cast<Class*>(object), type); // C++17: Use fold expression
     }
 
     template<size_t I>
@@ -644,7 +704,21 @@ struct PropertyCache final : PropertyCacheBase
     {
         dataStorage = ObjectWrapper<Class>::__data(d, __number<255>());
 
-        updateBases(d, TemplateParamList<BaseClasses...>{});
+        updateBases(d, TemplateParamList<BaseClasses...>{}); // C++17: Use fold expression
+    }
+
+    static std::unique_ptr<MetaObject> createStaticMetaObject(const QString &className) {
+        auto mo = new MetaObjectImpl<Class>;
+        mo->setClassName(className);
+        ObjectWrapper_t::__metadata(__number<255>(), mo);
+        appendBaseclassMetaObjects(mo, TemplateParamList<BaseClasses...>{}); // C++17: Use fold expression
+        return std::unique_ptr<MetaObject>{mo};
+    }
+
+
+    void *castObjectFromBases(Class *object, std::type_index type)
+    {
+        return castObjectFromBases(TemplateParamList<BaseClasses...>{}, object, type);
     }
 
 private:
@@ -658,6 +732,17 @@ private:
     }
     void updateBases(ObjectWrapperPrivate *, TemplateParamList<>)
     {}
+
+    template<typename Head, typename ...Rest>
+    static void appendBaseclassMetaObjects(MetaObjectImpl<Class> *mo, TemplateParamList<Head, Rest...>)
+    {
+        mo->addBaseClass(ObjectWrapper<Head>::staticMetaObject());
+
+        appendBaseclassMetaObjects(mo, TemplateParamList<Rest...>{});
+    }
+    static void appendBaseclassMetaObjects(MetaObjectImpl<Class> *, TemplateParamList<>)
+    {}
+
 
     PropertyCacheBase *getCacheFromBases(TemplateParamList<>, std::type_index)
     {
@@ -676,16 +761,22 @@ private:
         return ret;
     }
 
-    template<typename BaseHead, typename ...BaseRest>
-    void *castObjectFromBases(TemplateParamList<BaseHead, BaseRest...>, void *object, std::type_index type)
+    template<typename Head, typename ...Rest>
+    void *castObjectFromBases(TemplateParamList<Head, Rest...>, Class *object, std::type_index type)
     {
-        if (std::type_index { typeid(PropertyCache<BaseHead>) } == type) {
-            return static_cast<BaseHead*>(reinterpret_cast<Class*>(object));
+        if (std::type_index { typeid(PropertyCache<Head>) } == type) {
+            return static_cast<Head*>(object);
         }
 
-        return castObjectFromBases(TemplateParamList<BaseRest...>{});
+        constexpr size_t i = std::tuple_size<decltype(m_baseCaches)>::value - sizeof...(Rest) - 1;
+        auto ret = std::get<i>(m_baseCaches)->castObjectFromBases(static_cast<Head*>(object), type);
+        if (ret) {
+            return ret;
+        }
+
+        return castObjectFromBases(TemplateParamList<Rest...>{}, object, type);
     }
-    void *castObjectFromBases(TemplateParamList<>, void *, std::type_index)
+    void *castObjectFromBases(TemplateParamList<>, Class *, std::type_index)
     {
         return nullptr;
     }
@@ -696,9 +787,9 @@ class ObjectWrapperPrivate : public std::enable_shared_from_this<ObjectWrapperPr
 {
 public:
     template<typename T>
-    PropertyCache<T> *cache()
+    propertyCache_t<T> *cache()
     {
-        auto ret = dynamic_cast<PropertyCache<T>*>(m_cache->cache(typeid(PropertyCache<T>)));
+        auto ret = dynamic_cast<propertyCache_t<T>*>(m_cache->cache(typeid(propertyCache_t<T>)));
         Q_ASSERT(ret);
         return ret;
     }
@@ -706,7 +797,7 @@ public:
     template<typename T>
     T *object() const
     {
-        return reinterpret_cast<T*>(m_cache->castObject(m_object, typeid(PropertyCache<T>)));
+        return reinterpret_cast<T*>(m_cache->castObject(m_object, typeid(propertyCache_t<T>)));
     }
 
     explicit ObjectWrapperPrivate(void *object, std::unique_ptr<PropertyCacheBase> cache)
@@ -744,10 +835,20 @@ public:
     static_assert(isSpecialized<ObjectWrapper<T>>::value, "Can't create ObjectHandle: ObjectWrapper is not specialized on this type. Use DECLARE_OBJECT_WRAPPER to define a sepecialization.");
 
     explicit ObjectHandle(std::shared_ptr<ObjectWrapperPrivate> controlBlock);
+    explicit ObjectHandle(ObjectWrapper<T> wrapper) : m_d(std::move(wrapper)) {}
     explicit ObjectHandle() = default;
 
     explicit operator bool() const;
     explicit operator T*() const;
+
+    template<typename U>
+    operator ObjectHandle<U>()
+    {
+        static_assert(std::is_base_of<U, T>::value, "Cannot cast ObjectHandle to type U: U is not a baseclass of T.");
+        static_assert(isSpecialized<ObjectWrapper<T>>::value, "Cannot cast ObjectHandle to baseclass U: ObjectWrapper is not specialized on type U. Use DECLARE_OBJECT_WRAPPER to define a sepecialization.");
+
+        return ObjectHandle <U> { static_cast<ObjectWrapper<U>>(m_d) };
+    }
 
     inline const ObjectWrapper<T> *operator->() const;
     inline ObjectWrapper<T> *operator->();
@@ -852,7 +953,7 @@ std::shared_ptr<ObjectWrapperPrivate> ObjectWrapperPrivate::create(Class *object
     // guard the access with a semaphore. Also we're in object's thread, so we don't need to guard
     // against asynchronous deletions of object.
 
-    auto cache = make_unique<typename ObjectWrapper<Class>::PropertyCache_t>(); // recursively creates all subclasses' caches
+    auto cache = make_unique<propertyCache_t<Class>>(); // recursively creates all subclasses' caches
     auto d = std::make_shared<ObjectWrapperPrivate>(object, std::move(cache));
     ObjectWrapper<Class>::__connectToUpdates(d.get(), __number<255>{});
 

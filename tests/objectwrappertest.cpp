@@ -59,7 +59,7 @@ private:
     int m_x;
 };
 
-class DerivedTestObject : SimpleNonQObjectTestObject
+class DerivedTestObject : public SimpleNonQObjectTestObject
 {
 public:
     explicit DerivedTestObject(int x, int y, int z)
@@ -71,6 +71,35 @@ public:
 private:
     int m_z;
 
+};
+
+class TestMixin
+{
+public:
+    explicit TestMixin(int a)
+    : m_a(a)
+    {}
+
+    int a() const { return m_a; }
+
+private:
+    int m_a;
+};
+
+class MultiInheritanceTestObject : public DerivedTestObject, public TestMixin
+{
+
+public:
+    explicit MultiInheritanceTestObject(int x, int y, int z, int a, int b)
+    : DerivedTestObject{x, y, z}
+    , TestMixin {a}
+    , m_b{b}
+    {}
+
+    int b() const { return m_b; }
+
+private:
+    int m_b;
 };
 
 // class Foo {
@@ -227,9 +256,15 @@ DECLARE_OBJECT_WRAPPER(DisabledCachingTestObject,
                        DISABLE_CACHING
                        RO_PROP(x, Getter)
 )
-// DECLARE_OBJECT_WRAPPER_WB(DerivedTestObject, SimpleNonQObjectTestObject,
-//                        RO_PROP(z, Getter)
-// )
+DECLARE_OBJECT_WRAPPER_WB(DerivedTestObject, SimpleNonQObjectTestObject,
+                       RO_PROP(z, Getter)
+)
+DECLARE_OBJECT_WRAPPER(TestMixin,
+                          RO_PROP(a, Getter)
+)
+DECLARE_OBJECT_WRAPPER_WB2(MultiInheritanceTestObject, DerivedTestObject, TestMixin,
+                          RO_PROP(b, Getter)
+)
 namespace GammaRay {
 
 class ObjectWrapperTest : public BaseProbeTest
@@ -467,20 +502,46 @@ private slots:
     }
 
 
-//     void testSingleInheritance()
-//     {
-//         DerivedTestObject t {1, 2, 3};
-//         ObjectHandle<DerivedTestObject> w { &t };
-//
-//         QCOMPARE(w->x(), t.x());
-//         QCOMPARE(w->y(), t.y);
-//         QCOMPARE(w->z(), t.z());
-//
-// //         ObjectHandle<SimpleNonQObjectTestObject> v = w;
-//
-// //         QCOMPARE(w->x(), t.x());
-// //         QCOMPARE(w->y(), t.y);
-//     }
+    void testSingleInheritance()
+    {
+        DerivedTestObject t {1, 2, 3};
+        ObjectHandle<DerivedTestObject> w = ObjectShadowDataRepository::handleForObject(&t);
+
+        QCOMPARE(w->x(), t.x());
+        QCOMPARE(w->y(), t.y);
+        QCOMPARE(w->z(), t.z());
+
+        ObjectHandle<SimpleNonQObjectTestObject> v = w;
+
+        QCOMPARE(v->x(), t.x());
+        QCOMPARE(v->y(), t.y);
+    }
+
+
+    void testMultipleInheritance()
+    {
+        MultiInheritanceTestObject t {1, 2, 3, 4, 5};
+        ObjectHandle<MultiInheritanceTestObject> w = ObjectShadowDataRepository::handleForObject(&t);
+
+        QCOMPARE(w->x(), t.x());
+        QCOMPARE(w->y(), t.y);
+        QCOMPARE(w->z(), t.z());
+        QCOMPARE(w->a(), t.a());
+        QCOMPARE(w->b(), t.b());
+
+        ObjectHandle<SimpleNonQObjectTestObject> v = w;
+
+        QCOMPARE(v.object(), static_cast<SimpleNonQObjectTestObject*>(&t));
+        QCOMPARE(v->x(), t.x());
+        QCOMPARE(v->y(), t.y);
+
+
+        ObjectHandle<TestMixin> u = w;
+
+        QCOMPARE(u.object(), static_cast<TestMixin*>(&t));
+        QCOMPARE(u->a(), t.a());
+
+    }
 };
 
 }
