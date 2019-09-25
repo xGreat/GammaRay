@@ -813,7 +813,7 @@ public:
     template<typename Class, int storageIndex, int Flags, typename CommandFunc_t, typename std::enable_if<!(Flags & QProp)>::type* = nullptr>
     void connectToUpdates(CommandFunc_t, const char*) {}
 
-    template<typename Class, int storageIndex, int Flags, typename CommandFunc_t, typename std::enable_if<Flags & QProp>::type* = nullptr>
+    template<typename Class, int storageIndex, int Flags, typename CommandFunc_t, typename std::enable_if<(Flags & QProp) != 0>::type* = nullptr>
     void connectToUpdates(CommandFunc_t command, const char* propertyName);
 
     template<typename Class, int storageIndex, typename CommandFunc_t, typename SignalFunc_t>
@@ -910,7 +910,7 @@ private:
 
     QHash<void*, std::weak_ptr<ObjectWrapperPrivate>> m_objectToWrapperPrivateMap;
 
-    friend struct ObjectWrapperPrivate;
+    friend class ObjectWrapperPrivate;
     friend class ObjectWrapperTest;
 };
 
@@ -960,7 +960,7 @@ std::shared_ptr<ObjectWrapperPrivate> ObjectWrapperPrivate::create(Class *object
     return d;
 }
 
-template<typename Class, int storageIndex, int Flags, typename CommandFunc_t, typename std::enable_if<Flags & QProp>::type*>
+template<typename Class, int storageIndex, int Flags, typename CommandFunc_t, typename std::enable_if<(Flags & QProp) != 0>::type*>
 void ObjectWrapperPrivate::connectToUpdates(CommandFunc_t fetchFunction, const char* propertyName)
 {
     static_assert(std::is_base_of<QObject, Class>::value, "members with notify signals can only be defined for QObject-derived types.");
@@ -1120,7 +1120,7 @@ ObjectView<T>::ObjectView(std::weak_ptr<ObjectWrapperPrivate> controlBlock)
 template<typename T>
 ObjectView<T>::operator bool() const
 {
-    return !d.expired() && Probe::instance()->isValidObject(d.lock()->object<QObject>()); // FIXME we should not need to lock this just to do a null check
+    return !d.expired() && Probe::instance()->isValidObject(d.lock()->template object<QObject>()); // FIXME we should not need to lock this just to do a null check
 }
 
 template<typename T>
@@ -1155,7 +1155,7 @@ ObjectWrapper<T> &ObjectView<T>::operator*()
 template<typename T>
 T *ObjectView<T>::object() const
 {
-    return d.lock()->object<T>();
+    return d.lock()->template object<T>();
 }
 
 // === ObjectShadowDataRepository ===
@@ -1214,12 +1214,12 @@ auto wrap(T &&value) -> typename std::enable_if<!isSpecialized<ObjectWrapper<T>>
     return std::forward<T>(value);
 }
 template<int flags, typename T>
-auto wrap(T *object) -> second_t<typename ObjectWrapper<T>::value_type, typename std::enable_if<flags & NonOwningPointer, ObjectView<T>>::type>
+auto wrap(T *object) -> second_t<typename ObjectWrapper<T>::value_type, typename std::enable_if<(flags & NonOwningPointer) != 0, ObjectView<T>>::type>
 {
     return ObjectShadowDataRepository::viewForObject(object);
 }
 template<int flags, typename T>
-auto wrap(T *object) -> second_t<typename ObjectWrapper<T>::value_type, typename std::enable_if<flags & OwningPointer, ObjectHandle<T>>::type>
+auto wrap(T *object) -> second_t<typename ObjectWrapper<T>::value_type, typename std::enable_if<(flags & OwningPointer) != 0, ObjectHandle<T>>::type>
 {
     return ObjectShadowDataRepository::handleForObject(object);
 }
@@ -1231,7 +1231,7 @@ auto wrap(const QList<T*> &list) -> second_t<typename ObjectWrapper<T>::value_ty
     return handleList;
 }
 template<int flags, typename T>
-auto wrap(QVector<T*> list) -> second_t<typename ObjectWrapper<T>::value_type, typename std::enable_if<flags & NonOwningPointer, QVector<ObjectView<T>>>::type>
+auto wrap(QVector<T*> list) -> second_t<typename ObjectWrapper<T>::value_type, typename std::enable_if<(flags & NonOwningPointer) != 0, QVector<ObjectView<T>>>::type>
 {
     QVector<ObjectView<T>> handleList;
     handleList.reserve(list.size());
@@ -1242,7 +1242,7 @@ auto wrap(QVector<T*> list) -> second_t<typename ObjectWrapper<T>::value_type, t
     return handleList;
 }
 template<int flags, typename T>
-auto wrap(QVector<T*> list) -> second_t<typename ObjectWrapper<T>::value_type, typename std::enable_if<flags & OwningPointer, QVector<ObjectHandle<T>>>::type>
+auto wrap(QVector<T*> list) -> second_t<typename ObjectWrapper<T>::value_type, typename std::enable_if<(flags & OwningPointer) != 0, QVector<ObjectHandle<T>>>::type>
 {
     QVector<ObjectHandle<T>> handleList;
     handleList.reserve(list.size());
