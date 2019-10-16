@@ -67,6 +67,7 @@ public:
     {}
 
     int z() const { return m_z; }
+    void setZ(int z) { m_z = z; }
 
 private:
     int m_z;
@@ -76,27 +77,30 @@ private:
 class TestMixin
 {
 public:
-    explicit TestMixin(int a)
+    explicit TestMixin(double a)
     : m_a(a)
     {}
 
-    int a() const { return m_a; }
+    double a() const { return m_a; }
+
+    void setA(double a) { m_a = a; }
 
 private:
-    int m_a;
+    double m_a;
 };
 
 class MultiInheritanceTestObject : public DerivedTestObject, public TestMixin
 {
 
 public:
-    explicit MultiInheritanceTestObject(int x, int y, int z, int a, int b)
+    explicit MultiInheritanceTestObject(int x, int y, int z, double a, int b)
     : DerivedTestObject{x, y, z}
     , TestMixin {a}
     , m_b{b}
     {}
 
     int b() const { return m_b; }
+    void setB(int b) { m_b = b; }
 
 private:
     int m_b;
@@ -257,13 +261,13 @@ DECLARE_OBJECT_WRAPPER(DisabledCachingTestObject,
                        RO_PROP(x, Getter)
 )
 DECLARE_OBJECT_WRAPPER_WB(DerivedTestObject, SimpleNonQObjectTestObject,
-                       RO_PROP(z, Getter)
+                       RW_PROP(z, setZ, Getter)
 )
 DECLARE_OBJECT_WRAPPER(TestMixin,
-                          RO_PROP(a, Getter)
+                          RW_PROP(a, setA, Getter)
 )
 DECLARE_OBJECT_WRAPPER_WB2(MultiInheritanceTestObject, DerivedTestObject, TestMixin,
-                          RO_PROP(b, Getter)
+                          RW_PROP(b, setB, Getter)
 )
 namespace GammaRay {
 
@@ -520,7 +524,7 @@ private slots:
 
     void testMultipleInheritance()
     {
-        MultiInheritanceTestObject t {1, 2, 3, 4, 5};
+        MultiInheritanceTestObject t {1, 2, 3, 4.0, 5};
         ObjectHandle<MultiInheritanceTestObject> w = ObjectShadowDataRepository::handleForObject(&t);
 
         QCOMPARE(w->x(), t.x());
@@ -535,11 +539,68 @@ private slots:
         QCOMPARE(v->x(), t.x());
         QCOMPARE(v->y(), t.y);
 
-
         ObjectHandle<TestMixin> u = w;
 
         QCOMPARE(u.object(), static_cast<TestMixin*>(&t));
         QCOMPARE(u->a(), t.a());
+
+        // Test MetaObject
+        auto mo = ObjectHandle<MultiInheritanceTestObject>::staticMetaObject();
+
+        QCOMPARE(mo->className(), QStringLiteral("MultiInheritanceTestObject"));
+        QCOMPARE(mo->propertyCount(), 5);
+        QCOMPARE(mo->propertyAt(0)->name(), "y"); // TODO is it a problem that the meta object lists the properties in inverted order?
+        QCOMPARE(mo->propertyAt(0)->typeName(), "int");
+        QCOMPARE(mo->propertyAt(0)->value(&*w), 2); // FIXME Fix the getter-API for accessing values through ObjectHandle-MetaObjects
+        QCOMPARE(mo->propertyAt(1)->name(), "x");
+        QCOMPARE(mo->propertyAt(1)->typeName(), "int");
+        QCOMPARE(mo->propertyAt(1)->value(&*w), 1);
+
+        QCOMPARE(mo->propertyAt(2)->name(), "z");
+        QCOMPARE(mo->propertyAt(2)->typeName(), "int");
+        QCOMPARE(mo->propertyAt(2)->value(&*w), 3);
+        QCOMPARE(mo->propertyAt(3)->name(), "a");
+        QCOMPARE(mo->propertyAt(3)->typeName(), "double");
+        QCOMPARE(mo->propertyAt(3)->value(&*w), 4.0);
+        QCOMPARE(mo->propertyAt(4)->name(), "b");
+        QCOMPARE(mo->propertyAt(4)->typeName(), "int");
+        QCOMPARE(mo->propertyAt(4)->value(&*w), 5);
+
+        QVERIFY(mo->inherits(QStringLiteral("DerivedTestObject")));
+        auto mo_DTO = mo->superClass(0);
+        QCOMPARE(mo_DTO->className(), QStringLiteral("DerivedTestObject"));
+
+        auto mo_SNQOTO = mo_DTO->superClass(0);
+        QCOMPARE(mo_SNQOTO->className(), QStringLiteral("SimpleNonQObjectTestObject"));
+        QCOMPARE(mo_SNQOTO->propertyAt(0)->name(), "y");
+        QCOMPARE(mo_SNQOTO->propertyAt(0)->typeName(), "int");
+        QCOMPARE(mo_SNQOTO->propertyAt(0)->value(&*w), 2);
+        QCOMPARE(mo_SNQOTO->propertyAt(1)->name(), "x");
+        QCOMPARE(mo_SNQOTO->propertyAt(1)->typeName(), "int");
+        QCOMPARE(mo_SNQOTO->propertyAt(1)->value(&*w), 1);
+
+        auto mo_tm = mo->superClass(1);
+        QCOMPARE(mo_tm->className(), QStringLiteral("TestMixin"));
+        QCOMPARE(mo_tm->propertyAt(0)->name(), "a");
+        QCOMPARE(mo_tm->propertyAt(0)->typeName(), "double");
+        QCOMPARE(mo_tm->propertyAt(0)->value(&*w), 4.0);
+
+        // Test writing
+
+        w->setY(6);
+        w->setZ(7);
+        u->setA(8.3);
+        w->setB(9);
+
+
+        QCOMPARE(v->y(), 6);
+        QCOMPARE(v->y(), t.y);
+        QCOMPARE(w->z(), 7);
+        QCOMPARE(w->z(), t.z());
+        QCOMPARE(w->a(), 8.3);
+        QCOMPARE(w->a(), t.a());
+        QCOMPARE(w->b(), 9);
+        QCOMPARE(w->b(), t.b());
 
     }
 };

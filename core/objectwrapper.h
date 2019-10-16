@@ -647,12 +647,10 @@ struct PropertyCacheBase
     virtual PropertyCacheBase *cache(std::type_index type) = 0;
 
     /**
-    * Propagation chain here is:
-    * void * -> C* -> B* -> void * -> B*. All but the C to B cast are
-    * reinterpret_casts. The C to B is a static_cast and can actually alter the
-    * value of the pointer (because of multiple inheritance)
-    */
-    virtual void *castObject(void *object, std::type_index type) = 0;
+     * Just returns the object pointer as this propertycache sees it
+     * (might NOT be a valid pointer to the most-derived object)
+     */
+    virtual void *object() const = 0;
 };
 
 class ObjectWrapperPrivate;
@@ -666,11 +664,13 @@ struct PropertyCache final : PropertyCacheBase
 
     Data_t dataStorage;
     std::tuple<std::unique_ptr<propertyCache_t<BaseClasses>>...> m_baseCaches;
+    Class *m_object;
 
     ~PropertyCache() override = default;
 
-    explicit PropertyCache()
-        : m_baseCaches(make_unique<propertyCache_t<BaseClasses>>()...)
+    explicit PropertyCache(Class *object)
+        : m_baseCaches(make_unique<propertyCache_t<BaseClasses>>(object)...)
+        , m_object(object)
     {
     }
 
@@ -681,15 +681,6 @@ struct PropertyCache final : PropertyCacheBase
         }
 
         return getCacheFromBases(TemplateParamList<BaseClasses...>{}, type); // C++17: Use fold expression
-    }
-
-    void *castObject(void *object, std::type_index type) override
-    {
-        if (std::type_index { typeid(decltype(*this)) } == type) {
-            return object;
-        }
-
-        return castObjectFromBases(TemplateParamList<BaseClasses...>{}, reinterpret_cast<Class*>(object), type); // C++17: Use fold expression
     }
 
     template<size_t I>
@@ -716,9 +707,9 @@ struct PropertyCache final : PropertyCacheBase
     }
 
 
-    void *castObjectFromBases(Class *object, std::type_index type)
+    void *object() const override
     {
-        return castObjectFromBases(TemplateParamList<BaseClasses...>{}, object, type);
+        return m_object;
     }
 
 private:
@@ -744,12 +735,12 @@ private:
     {}
 
 
-    PropertyCacheBase *getCacheFromBases(TemplateParamList<>, std::type_index)
+    PropertyCacheBase *getCacheFromBases(TemplateParamList<>, std::type_index) const
     {
         return nullptr;
     }
     template<typename Head, typename ...Rest>
-    PropertyCacheBase *getCacheFromBases(TemplateParamList<Head, Rest...>, std::type_index type)
+    PropertyCacheBase *getCacheFromBases(TemplateParamList<Head, Rest...>, std::type_index type) const
     {
         constexpr size_t i = std::tuple_size<decltype(m_baseCaches)>::value - sizeof...(Rest) - 1;
         auto ret = std::get<i>(m_baseCaches)->cache(type);
@@ -760,26 +751,6 @@ private:
 
         return ret;
     }
-
-    template<typename Head, typename ...Rest>
-    void *castObjectFromBases(TemplateParamList<Head, Rest...>, Class *object, std::type_index type)
-    {
-        if (std::type_index { typeid(PropertyCache<Head>) } == type) {
-            return static_cast<Head*>(object);
-        }
-
-        constexpr size_t i = std::tuple_size<decltype(m_baseCaches)>::value - sizeof...(Rest) - 1;
-        auto ret = std::get<i>(m_baseCaches)->castObjectFromBases(static_cast<Head*>(object), type);
-        if (ret) {
-            return ret;
-        }
-
-        return castObjectFromBases(TemplateParamList<Rest...>{}, object, type);
-    }
-    void *castObjectFromBases(TemplateParamList<>, Class *, std::type_index)
-    {
-        return nullptr;
-    }
 };
 
 
@@ -787,7 +758,7 @@ class ObjectWrapperPrivate : public std::enable_shared_from_this<ObjectWrapperPr
 {
 public:
     template<typename T>
-    propertyCache_t<T> *cache()
+    propertyCache_t<T> *cache() const
     {
         auto ret = dynamic_cast<propertyCache_t<T>*>(m_cache->cache(typeid(propertyCache_t<T>)));
         Q_ASSERT(ret);
@@ -797,12 +768,11 @@ public:
     template<typename T>
     T *object() const
     {
-        return reinterpret_cast<T*>(m_cache->castObject(m_object, typeid(propertyCache_t<T>)));
+        return cache<T>()->m_object;
     }
 
-    explicit ObjectWrapperPrivate(void *object, std::unique_ptr<PropertyCacheBase> cache)
-    : m_object(object)
-    , m_cache(std::move(cache))
+    explicit ObjectWrapperPrivate(std::unique_ptr<PropertyCacheBase> cache)
+     : m_cache(std::move(cache))
     {}
 
     inline ~ObjectWrapperPrivate();
@@ -822,7 +792,6 @@ public:
     std::vector<QMetaObject::Connection> connections;
     QSemaphore semaphore { 1 };
 private:
-    void *m_object;
     std::unique_ptr<PropertyCacheBase> m_cache;
 };
 
@@ -953,8 +922,8 @@ std::shared_ptr<ObjectWrapperPrivate> ObjectWrapperPrivate::create(Class *object
     // guard the access with a semaphore. Also we're in object's thread, so we don't need to guard
     // against asynchronous deletions of object.
 
-    auto cache = make_unique<propertyCache_t<Class>>(); // recursively creates all subclasses' caches
-    auto d = std::make_shared<ObjectWrapperPrivate>(object, std::move(cache));
+    auto cache = make_unique<propertyCache_t<Class>>(object); // recursively creates all subclasses' caches
+    auto d = std::make_shared<ObjectWrapperPrivate>(std::move(cache));
     ObjectWrapper<Class>::__connectToUpdates(d.get(), __number<255>{});
 
     return d;
@@ -964,7 +933,7 @@ template<typename Class, int storageIndex, int Flags, typename CommandFunc_t, ty
 void ObjectWrapperPrivate::connectToUpdates(CommandFunc_t fetchFunction, const char* propertyName)
 {
     static_assert(std::is_base_of<QObject, Class>::value, "members with notify signals can only be defined for QObject-derived types.");
-    auto object = static_cast<QObject*>(m_object);
+    auto object = static_cast<QObject*>(cache<Class>()->m_object);
     auto mo = object->metaObject();
     auto prop = mo->property(mo->indexOfProperty(propertyName));
 
@@ -996,7 +965,7 @@ template<typename Class, int storageIndex, typename CommandFunc_t, typename Sign
 void ObjectWrapperPrivate::connectToUpdates(CommandFunc_t command, SignalFunc_t signal)
 {
     static_assert(std::is_base_of<QObject, Class>::value, "members with notify signals can only be defined for QObject-derived types.");
-    auto object = static_cast<QObject*>(m_object);
+    auto object = static_cast<QObject*>(cache<Class>()->m_object);
     auto weakSelf = std::weak_ptr<ObjectWrapperPrivate> { shared_from_this() };
     auto f = [weakSelf, command]() {
         std::cout << "Updating cache."<< storageIndex <<"\n";
@@ -1018,7 +987,7 @@ ObjectWrapperPrivate::~ObjectWrapperPrivate()
     for (auto &&c : connections) {
         QObject::disconnect(c);
     }
-    ObjectShadowDataRepository::instance()->m_objectToWrapperPrivateMap.remove(m_object);
+    ObjectShadowDataRepository::instance()->m_objectToWrapperPrivateMap.remove(m_cache->object());
 }
 
 // === ObjectHandle ===
@@ -1100,7 +1069,7 @@ auto ObjectHandle<T>::call(Func &&f, Args &&...args) -> std::future<decltype(std
 template<typename T>
 void ObjectHandle<T>::refresh()
 {
-    m_d.d->template cache<T>()->update(m_d.d.get());
+    m_d.d_ptr()->template cache<T>()->update(m_d.d_ptr());
 }
 
 
