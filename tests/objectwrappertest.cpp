@@ -146,6 +146,15 @@ private:
 // };
 
 
+
+class QObjectTestObjectPrivate : public QObjectPrivate
+{
+public:
+    double hiddenVariable = -1.0/12.0;
+
+    QString hiddenVarStr() const { return QString::number(hiddenVariable); }
+};
+
 class QObjectTestObject : public QObject {
     Q_OBJECT
     Q_PROPERTY(int x READ x WRITE setX NOTIFY xChanged)
@@ -157,8 +166,18 @@ signals:
     void yChanged();
 
 public:
-    QObjectTestObject(QObjectTestObject *parent = nullptr) : QObject(parent), t(new QTimer(this)), m_parent(parent) {}
-    explicit QObjectTestObject(int x, int y, QObjectTestObject *parent = nullptr) : QObject(parent), t(new QTimer(this)), m_x(x), m_y(y), m_parent(parent) {}
+    QObjectTestObject(QObjectTestObject *parent = nullptr)
+        : QObject(*new QObjectTestObjectPrivate{}, parent)
+        , t(new QTimer(this))
+        , m_parent(parent)
+    {}
+    explicit QObjectTestObject(int x, int y, QObjectTestObject *parent = nullptr)
+        : QObject(*new QObjectTestObjectPrivate{}, parent)
+        , t(new QTimer(this))
+        , m_x(x)
+        , m_y(y)
+        , m_parent(parent)
+    {}
     virtual ~QObjectTestObject() {}
     int x() const { return m_x; }
     int y() const { return m_y; }
@@ -184,6 +203,8 @@ private:
     int m_x = 8;
     int m_y = 10;
     QObjectTestObject *m_parent = nullptr;
+
+    Q_DECLARE_PRIVATE(QObjectTestObject)
 };
 
 int getChildrenCount(const QObjectTestObject *obj)
@@ -242,6 +263,7 @@ DECLARE_OBJECT_WRAPPER(SimpleNonQObjectTestObject,
 )
 DECLARE_OBJECT_WRAPPER(QTimer, RO_PROP(isActive, Getter))
 DECLARE_OBJECT_WRAPPER(QObjectTestObject,
+                       PRIVATE_CLASS(QObjectTestObjectPrivate)
                        RO_PROP(x, Getter | QProp)
                        RW_PROP(y, setY, Getter | QProp)
                        RO_PROP(str, NonConstGetter)
@@ -250,6 +272,8 @@ DECLARE_OBJECT_WRAPPER(QObjectTestObject,
                        RO_PROP(children, Getter | OwningPointer)
                        RO_PROP(parent, Getter | NonOwningPointer)
                        CUSTOM_PROP(childrenCount, getChildrenCount(object), CustomCommand)
+                       RO_PROP(hiddenVariable, DptrMember)
+                       RO_PROP(hiddenVarStr, DptrGetter)
 )
 DECLARE_OBJECT_WRAPPER(LinkedList,
                        RO_PROP(i, Getter)
@@ -292,12 +316,16 @@ private slots:
         ObjectHandle<QObjectTestObject> w = ObjectShadowDataRepository::handleForObject(&t);
         //     error<decltype(w->children())>();
 
+        static_assert(std::is_same<pimplClass_t<ObjectWrapper<QObjectTestObject>>, QObjectTestObjectPrivate>::value, "Something is wrong with pimplClass_t...");
 
         QCOMPARE(w->x(), t.x());
         QCOMPARE(w->y(), t.y());
         QCOMPARE(w->str(), t.str());
         QCOMPARE(w->halloDu(), QStringLiteral("Hello, you."));
         QCOMPARE(w->t()->isActive(), t.t->isActive());
+        auto d = static_cast<QObjectTestObjectPrivate*>(QObjectPrivate::get(&t));
+        QCOMPARE(w->hiddenVariable(), d->hiddenVariable);
+        QCOMPARE(w->hiddenVarStr(), d->hiddenVarStr());
 
         t.setX(16);
         t.setY(20);

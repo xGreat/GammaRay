@@ -134,17 +134,17 @@ void SetterName(decltype(fetch_##FieldName<Flags>(static_cast<value_type*>(nullp
  * This is internal for use in other macros.
  */
 #define DEFINE_FETCH_FUNCTION_PROP(FieldName) \
-template<int Flags, typename T = value_type, typename std::enable_if<(Flags & DptrGetter) != 0>::type* = nullptr> /*FIXME T must be the private class! */ \
+template<int Flags, typename T = pimplClass_t<ThisClass_t>, typename std::enable_if<(Flags & DptrGetter) != 0>::type* = nullptr> /*FIXME T must be the private class! */ \
 static auto fetch_##FieldName(const value_type *object) \
 -> decltype(wrap<Flags>(std::declval<T>().FieldName())) \
 { \
-    return wrap<Flags>(T::get(object)->FieldName()); \
+    return wrap<Flags>(static_cast<const T*>(T::get(object))->FieldName()); \
 } \
-template<int Flags, typename T = value_type, typename std::enable_if<(Flags & DptrMember) != 0>::type* = nullptr> /*FIXME T must be the private class! */ \
+template<int Flags, typename T = pimplClass_t<ThisClass_t>, typename std::enable_if<(Flags & DptrMember) != 0>::type* = nullptr> /*FIXME T must be the private class! */ \
 static auto fetch_##FieldName(const value_type *object) \
 -> decltype(wrap<Flags>(std::declval<T>().FieldName)) \
 { \
-    return wrap<Flags>(T::get(object)->FieldName); \
+    return wrap<Flags>(static_cast<const T*>(T::get(object))->FieldName); \
 } \
 template<int Flags, typename T = value_type, typename std::enable_if<(Flags & Getter) != 0>::type* = nullptr> \
 static auto fetch_##FieldName(const T *object) \
@@ -188,15 +188,15 @@ static auto fetch_##FieldName(const T *object) \
  * This is internal for use in other macros.
  */
 #define DEFINE_WRITE_FUNCTION_PROP(FieldName, SetterName) \
-template<int Flags, typename T = value_type, typename std::enable_if<(Flags & DptrGetter) != 0>::type* = nullptr> /*FIXME T must be the private class! */ \
+template<int Flags, typename T = pimplClass_t<ThisClass_t>, typename std::enable_if<(Flags & DptrGetter) != 0>::type* = nullptr> /*FIXME T must be the private class! */ \
 static void write_##FieldName(value_type *object, decltype(std::declval<T>().FieldName()) newVal) \
 { \
-    T::get(object)->SetterName(newVal); \
+    static_cast<T*>(T::get(object))->SetterName(newVal); \
 } \
-template<int Flags, typename T = value_type, typename std::enable_if<(Flags & DptrMember) != 0>::type* = nullptr> /*FIXME T must be the private class! */ \
+template<int Flags, typename T = pimplClass_t<ThisClass_t>, typename std::enable_if<(Flags & DptrMember) != 0>::type* = nullptr> /*FIXME T must be the private class! */ \
 static void write_##FieldName(value_type *object, decltype(std::declval<T>().FieldName) newVal) \
 { \
-    T::get(object)->FieldName = newVal; \
+    static_cast<T*>(T::get(object))->FieldName = newVal; \
 } \
 template<int Flags, typename T = value_type, typename std::enable_if<(Flags & Getter) != 0>::type* = nullptr> \
 static void write_##FieldName(T *object, decltype(std::declval<T>().FieldName()) newVal) \
@@ -448,6 +448,15 @@ template<typename ...Args> void MethodName(Args &&...args) \
 #define DISABLE_CACHING using disableCaching_t = void;
 
 
+/**
+ * Put this macro in the va_args area of DECLARE_OBJECT_WRAPPER to
+ * set the name of the private (pimpl-) class of the type, you're
+ * wrapping. This is necessary for properties of type DptrGetter and
+ * DptrMember.
+ */
+#define PRIVATE_CLASS(PrivateClassName) using pimpl_t = PrivateClassName;
+
+
 #define OBJECT_WRAPPER_COMMON(Class, ...) \
 public: \
     using value_type = Class; \
@@ -639,6 +648,12 @@ struct isSpecialized<Wrapper, void_t<typename Wrapper::ThisClass_t>>
 
 template<typename T>
 using propertyCache_t = typename ObjectWrapper<T>::PropertyCache_t;
+
+template<typename T, typename Enable = void>
+struct pimplClass { using type = void; };
+template<typename T>
+struct pimplClass<T, void_t<typename T::pimpl_t>> { using type = typename T::pimpl_t; };
+template<typename T> using pimplClass_t = typename pimplClass<T>::type;
 
 struct PropertyCacheBase
 {
