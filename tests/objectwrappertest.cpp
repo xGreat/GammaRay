@@ -59,6 +59,16 @@ private:
     int m_x;
 };
 
+class NonConstGetterTestObject {
+public:
+    explicit NonConstGetterTestObject(int x) : m_x(x) {}
+
+    int x() { return m_x; }
+
+private:
+    int m_x;
+};
+
 class DerivedTestObject : public SimpleNonQObjectTestObject
 {
 public:
@@ -261,12 +271,16 @@ DECLARE_OBJECT_WRAPPER(SimpleNonQObjectTestObject,
                        RO_PROP(x, Getter)
                        RW_PROP(y, setY, MemberVar)
 )
+DECLARE_OBJECT_WRAPPER(NonConstGetterTestObject,
+                       RO_PROP(x, Getter | NonConst)
+                       CUSTOM_PROP(y, object->x() * 2.0, NonConst)
+)
 DECLARE_OBJECT_WRAPPER(QTimer, RO_PROP(isActive, Getter))
 DECLARE_OBJECT_WRAPPER(QObjectTestObject,
                        PRIVATE_CLASS(QObjectTestObjectPrivate)
                        RO_PROP(x, Getter | QProp)
                        RW_PROP(y, setY, Getter | QProp)
-                       RO_PROP(str, NonConstGetter)
+                       RO_PROP(str, Getter | NonConst)
                        CUSTOM_PROP(halloDu, object->echo("Hello, you."), CustomCommand)
                        RO_PROP(t, MemberVar | OwningPointer)
                        RO_PROP(children, Getter | OwningPointer)
@@ -477,6 +491,15 @@ private slots:
 
         QCOMPARE(w->x(), t.x());
         QCOMPARE(w->y(), t.y);
+    }
+
+    void testNonConstGetter()
+    {
+        NonConstGetterTestObject t {1};
+        ObjectHandle<NonConstGetterTestObject> w = ObjectShadowDataRepository::handleForObject(&t);
+
+        QCOMPARE(w->x(), t.x());
+        QCOMPARE(w->y(), t.x() * 2.0);
     }
 
     void testCachingDisabled()

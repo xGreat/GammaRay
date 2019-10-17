@@ -69,15 +69,15 @@ template<int i> class err;
 enum ObjectWrapperFlag {
     NoFlags = 0,
     Getter = 1,
-    NonConstGetter = 2,
-    MemberVar = 4,
-    DptrGetter = 8,
-    DptrMember = 16,
-    CustomCommand = 32,
+    MemberVar = 2,
+    DptrGetter = 4,
+    DptrMember = 8,
+    CustomCommand = 16,
 
     QProp = 128,
     OwningPointer = 256,
-    NonOwningPointer = 512
+    NonOwningPointer = 512,
+    NonConst = 1024,
 };
 
 
@@ -146,13 +146,13 @@ static auto fetch_##FieldName(const value_type *object) \
 { \
     return wrap<Flags>(static_cast<const T*>(T::get(object))->FieldName); \
 } \
-template<int Flags, typename T = value_type, typename std::enable_if<(Flags & Getter) != 0>::type* = nullptr> \
+template<int Flags, typename T = value_type, typename std::enable_if<(Flags & Getter) != 0 && (Flags & NonConst) == 0>::type* = nullptr> \
 static auto fetch_##FieldName(const T *object) \
 -> decltype(wrap<Flags>(std::declval<T>().FieldName())) \
 { \
     return wrap<Flags>(object->FieldName()); \
 } \
-template<int Flags, typename T = value_type, typename std::enable_if<(Flags & NonConstGetter) != 0>::type* = nullptr> \
+template<int Flags, typename T = value_type, typename std::enable_if<(Flags & Getter) != 0 && (Flags & NonConst) != 0>::type* = nullptr> \
 static auto fetch_##FieldName(T *object) \
 -> decltype(wrap<Flags>(std::declval<T>().FieldName())) \
 { \
@@ -171,8 +171,14 @@ static auto fetch_##FieldName(const T *object) \
  * This is internal for use in other macros.
  */
 #define DEFINE_FETCH_FUNCTION_CUSTOM_EXPRESSION(FieldName, Expr) \
-template<int Flags, typename T = value_type> \
+template<int Flags, typename T = value_type, typename std::enable_if<(Flags & NonConst) == 0>::type* = nullptr> \
 static auto fetch_##FieldName(const T *object) \
+-> decltype(wrap<Flags>(Expr)) \
+{ \
+    return wrap<Flags>(Expr); \
+} \
+template<int Flags, typename T = value_type, typename std::enable_if<(Flags & NonConst) != 0>::type* = nullptr> \
+static auto fetch_##FieldName(T *object) \
 -> decltype(wrap<Flags>(Expr)) \
 { \
     return wrap<Flags>(Expr); \
@@ -199,11 +205,6 @@ static void write_##FieldName(value_type *object, decltype(std::declval<T>().Fie
     static_cast<T*>(T::get(object))->FieldName = newVal; \
 } \
 template<int Flags, typename T = value_type, typename std::enable_if<(Flags & Getter) != 0>::type* = nullptr> \
-static void write_##FieldName(T *object, decltype(std::declval<T>().FieldName()) newVal) \
-{ \
-    object->SetterName(newVal); \
-} \
-template<int Flags, typename T = value_type, typename std::enable_if<(Flags & NonConstGetter) != 0>::type* = nullptr> \
 static void write_##FieldName(T *object, decltype(std::declval<T>().FieldName()) newVal) \
 { \
     object->SetterName(newVal); \
@@ -305,12 +306,13 @@ static void __connectToUpdates(ObjectWrapperPrivate *d, __number<W_COUNTER_##Fie
  *
  * The property can be customized by a couple of \p Flags:
  *  Getter: If this flag is set, data will be fetched using obj->FieldName()
- *  NonConstGetter: Like getter, but indicating that the getter is non-const
  *  MemberVar: Data will be fetched by accessing the member field obj->FieldName directly
  *  DptrGetter: Data will be fetched by accessing ClassPrivate::get(obj)->FieldName()
  *  DptrMember: Data will be fetched by accessing ClassPrivate::get(obj)->FieldName
  *  CustomCommand: Incompatible with this macro. Use CUSTOM_PROP instead.
  *
+ *  NonConst: Indicates that the getter is non-const, thus making the wrapped
+ *            getter non-const, too.
  *  QProp: Indicates that there exists a Qt property with this name. Setting
  *         this flag will enable reading, writing as well as automatic updating.
  *  OwningPointer: Indicates that the object owns the object which this property
@@ -320,8 +322,8 @@ static void __connectToUpdates(ObjectWrapperPrivate *d, __number<W_COUNTER_##Fie
  *                   this property points to. Setting this correctly is crucial
  *                   for memory management of the object wrapper.
  *
- * It is necessary to set one of Getter/NonConstGetter/MemberVar/DptrGetter/
- * DptrMember. Further, for properties that are pointers to other wrappable
+ * It is necessary to set one of Getter/MemberVar/DptrGetter/DptrMember.
+ * Further, for properties that are pointers to other wrappable
  * objects, it's necessary to set either OwningPointer or NonOwningPointer.
  *
  * Example: If you used obj->x() before to access some data, you can make that
@@ -345,7 +347,6 @@ CONNECT_TO_UPDATES(FieldName, Flags) \
  * The property can be customized by a couple of \p Flags:
  *  Getter: If this flag is set, data will be fetched using obj->FieldName()
  *          and written using obj->SetterName(newVal).
- *  NonConstGetter: Like getter, but indicating that the getter is non-const.
  *  MemberVar: Data will be fetched/written by accessing the member field
  *             obj->FieldName directly.
  *  DptrGetter: Data will be fetched by accessing ClassPrivate::get(obj)->FieldName()
@@ -354,6 +355,8 @@ CONNECT_TO_UPDATES(FieldName, Flags) \
  *              ClassPrivate::get(obj)->FieldName.
  *  CustomCommand: Incompatible with this macro. Use CUSTOM_PROP instead.
  *
+ *  NonConst: Indicates that the getter is non-const, thus making the wrapped
+ *            getter non-const, too.
  *  QProp: Indicates that there exists a Qt property with this name. Setting
  *         this flag will enable reading, writing as well as automatic updating.
  *  OwningPointer: Indicates that the object owns the object which this property
@@ -363,8 +366,8 @@ CONNECT_TO_UPDATES(FieldName, Flags) \
  *                   this property points to. Setting this correctly is crucial
  *                   for memory management of the object wrapper.
  *
- * It is necessary to set one of Getter/NonConstGetter/MemberVar/DptrGetter/
- * DptrMember. Further, for properties that are pointers to other wrappable
+ * It is necessary to set one of Getter/MemberVar/DptrGetter/DptrMember.
+ * Further, for properties that are pointers to other wrappable
  * objects, it's necessary to set either OwningPointer or NonOwningPointer.
  *
  * Example: If you used obj->x() before to access some data, you can make that
@@ -388,11 +391,13 @@ CONNECT_TO_UPDATES(FieldName, Flags) \
  * context where `object` is a valid C-pointer pointing to the wrapped object.
  *
  * The property can be customized by a couple of \p Flags:
- *  Getter, NonConstGetter, MemberVar, DptrGetter, DptrMember: Incompatible
+ *  Getter, MemberVar, DptrGetter, DptrMember: Incompatible
  *      with this macro. Use PROP instead.
  *  CustomCommand: Optional when using this macro. Indicates that data is to be
  *                 fetched using the custom command \p Expression.
  *
+ *  NonConst: Indicates that the expression is non-const, thus making the wrapped
+ *            getter non-const, too.
  *  QProp: Indicates that there exists a Qt property with this name. Setting
  *         this flag will enable reading, writing as well as automatic updating.
  *  OwningPointer: Indicates that the object owns the object which this property
