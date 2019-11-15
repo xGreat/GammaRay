@@ -94,5 +94,3 @@ and improve your development efficiency.
 GammaRay and the GammaRay logo are registered trademarks of Klarälvdalens Datakonsult AB
 in the European Union, the United States and/or other countries.  Other product and
 company names and logos may be trademarks or registered trademarks of their respective companies.
-
-Test
