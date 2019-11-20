@@ -521,8 +521,9 @@ private: \
  * will have. Also put DISABLE_CACHING here, if desired.
  */
 #define DECLARE_OBJECT_WRAPPER(Class, ...) \
+namespace GammaRay { \
 template<> \
-class GammaRay::ObjectWrapper<Class> \
+class ObjectWrapper<Class> \
 { \
 public: \
     static std::tuple<> __data(ObjectWrapperPrivate *, __number<0>) { return {}; } \
@@ -550,6 +551,7 @@ public: \
 protected: \
     std::shared_ptr<ObjectWrapperPrivate> d; \
 }; \
+} \
 Q_DECLARE_METATYPE(GammaRay::ObjectWrapper<Class>) \
 Q_DECLARE_METATYPE(GammaRay::ObjectHandle<Class>) \
 Q_DECLARE_METATYPE(GammaRay::ObjectView<Class>)
@@ -567,8 +569,9 @@ Q_DECLARE_METATYPE(GammaRay::ObjectView<Class>)
  * the wrapper will have. Also put DISABLE_CACHING here, if desired.
  */
 #define DECLARE_OBJECT_WRAPPER_WB(Class, BaseClass, ...) \
+namespace GammaRay { \
 template<> \
-class GammaRay::ObjectWrapper<Class> : public GammaRay::ObjectWrapper<BaseClass> \
+class ObjectWrapper<Class> : public ObjectWrapper<BaseClass> \
 { \
 public: \
     /* We hide the base classes __data and __metadata functions on purpose and start counting at 0 again. */ \
@@ -593,6 +596,7 @@ public: \
     OBJECT_WRAPPER_COMMON(Class, __VA_ARGS__) \
 private: \
 }; \
+} \
 Q_DECLARE_METATYPE(GammaRay::ObjectWrapper<Class>) \
 Q_DECLARE_METATYPE(GammaRay::ObjectHandle<Class>) \
 Q_DECLARE_METATYPE(GammaRay::ObjectView<Class>)
@@ -610,8 +614,9 @@ Q_DECLARE_METATYPE(GammaRay::ObjectView<Class>)
  * the wrapper will have. Also put DISABLE_CACHING here, if desired.
  */
 #define DECLARE_OBJECT_WRAPPER_WB2(Class, BaseClass1, BaseClass2, ...) \
+namespace GammaRay { \
 template<> \
-class GammaRay::ObjectWrapper<Class> : public GammaRay::ObjectWrapper<BaseClass1>, public GammaRay::ObjectWrapper<BaseClass2> \
+class ObjectWrapper<Class> : public ObjectWrapper<BaseClass1>, public ObjectWrapper<BaseClass2> \
 { \
 public: \
     /* We hide the base classes __data and __metadata functions on purpose and start counting at 0 again. */ \
@@ -646,6 +651,7 @@ public: \
     OBJECT_WRAPPER_COMMON(Class, __VA_ARGS__) \
 private: \
 }; \
+} \
 Q_DECLARE_METATYPE(GammaRay::ObjectWrapper<Class>) \
 Q_DECLARE_METATYPE(GammaRay::ObjectHandle<Class>) \
 Q_DECLARE_METATYPE(GammaRay::ObjectView<Class>)

@@ -565,7 +565,7 @@ private slots:
         ObjectHandle<LinkedList> w = ObjectShadowDataRepository::handleForObject(&ll);
         ObjectHandle<LinkedList> w2 = ObjectShadowDataRepository::handleForObject(new LinkedList { 7, new LinkedList(8) });
 
-        static_assert(std::is_same<decltype(unwrap(w2)), LinkedList *>::value);
+        static_assert(std::is_same<decltype(unwrap(w2)), LinkedList *>::value, "Unwrapping the linked list handle failed.");
 
         QCOMPARE(w->next()->next(), ObjectHandle<LinkedList>{});
         w->next()->setNext(w2);
