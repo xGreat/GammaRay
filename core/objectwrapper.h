@@ -676,6 +676,11 @@ template<int N> struct __number : public __number<N - 1> {
 // Specialize for 0 to break the recursion.
 template<> struct __number<0> { static constexpr int value = 0; };
 
+template<typename T1, typename ...Rest> struct first
+{
+    using type = T1;
+};
+template<typename ...Args> using first_t = typename first<Args...>::type;
 template<typename T1, typename T2> using second_t = T2;
 
 
@@ -718,6 +723,38 @@ struct PropertyCacheBase
 
 class ObjectWrapperPrivate;
 
+template<typename Class, typename PrimaryBaseClass, typename ...SecondaryBaseClasses>
+std::tuple<
+    std::unique_ptr<propertyCache_t<PrimaryBaseClass>>,
+    std::unique_ptr<propertyCache_t<SecondaryBaseClasses>>...
+> moveAndCreateBaseclassCaches(
+    Class *object,
+    std::unique_ptr<propertyCache_t<PrimaryBaseClass>> primaryBaseCache
+)
+{
+    return std::tuple<
+    std::unique_ptr<propertyCache_t<PrimaryBaseClass>>,
+    std::unique_ptr<propertyCache_t<SecondaryBaseClasses>>...
+    > {
+        std::move(primaryBaseCache),
+        make_unique<propertyCache_t<SecondaryBaseClasses>>(object)...
+    };
+}
+
+// stolen from boost
+template<class T, class U> std::unique_ptr<T> dynamic_pointer_cast( std::unique_ptr<U> && r ) noexcept
+{
+    (void) dynamic_cast< T* >( static_cast< U* >( 0 ) );
+
+    static_assert( std::has_virtual_destructor<T>::value, "The target of dynamic_pointer_cast must have a virtual destructor." );
+
+    T * p = dynamic_cast<T*>( r.get() );
+    if( p ) r.release();
+    return std::unique_ptr<T>( p );
+}
+
+struct IncompleteConstructionTag_t {};
+
 template<typename Class, typename ...BaseClasses>
 struct PropertyCache final : PropertyCacheBase
 {
@@ -735,6 +772,41 @@ struct PropertyCache final : PropertyCacheBase
         : m_baseCaches(make_unique<propertyCache_t<BaseClasses>>(object)...)
         , m_object(object)
     {
+    }
+    explicit PropertyCache(Class *object, IncompleteConstructionTag_t)
+    : m_object(object) {}
+
+
+    template<typename T = Class>
+    static std::unique_ptr<PropertyCacheBase> fromBaseclassCache(
+        typename std::enable_if<std::is_same<T, Class>::value && sizeof...(BaseClasses) == 0, Class *>::type,
+        std::unique_ptr<PropertyCacheBase> baseCache)
+    {
+        Q_ASSERT(dynamic_cast<PropertyCache *>(baseCache.get()) != nullptr);
+        return baseCache;
+    }
+
+    template<typename T = Class>
+    static std::unique_ptr<PropertyCacheBase> fromBaseclassCache(
+        typename std::enable_if<std::is_same<T, Class>::value && sizeof...(BaseClasses) != 0, Class *>::type object,
+        std::unique_ptr<PropertyCacheBase> baseCache)
+    {
+        using BaseCache_t = propertyCache_t<first_t<BaseClasses...>>;
+        if (dynamic_cast<PropertyCache *>(baseCache.get()) != nullptr) {
+            // baseCache is already a cache object for type Class, so no need
+            // to expand the cache, just return it as it is.
+            return baseCache;
+        }
+
+        auto directBaseCache = BaseCache_t::fromBaseclassCache(object, std::move(baseCache));
+
+        auto cache = make_unique<PropertyCache>(object, IncompleteConstructionTag_t{});
+        cache->m_baseCaches = moveAndCreateBaseclassCaches<Class, BaseClasses...>(
+            object,
+            dynamic_pointer_cast<BaseCache_t>(std::move(directBaseCache))
+        );
+
+        return cache;
     }
 
     PropertyCacheBase *cache(std::type_index type) override
@@ -830,6 +902,19 @@ public:
         auto ret = dynamic_cast<propertyCache_t<T>*>(m_cache->cache(typeid(propertyCache_t<T>)));
         Q_ASSERT(ret);
         return ret;
+    }
+
+    template<typename T>
+    bool isComplete() const
+    {
+        return m_cache->cache(typeid(propertyCache_t<T>));
+    }
+
+    template<typename T>
+    void expandCache(T *obj)
+    {
+        m_cache = propertyCache_t<T>::fromBaseclassCache(obj, std::move(m_cache));
+        ObjectWrapper<T>::__connectToUpdates(this, __number<255>{});
     }
 
     template<typename T>
@@ -1462,6 +1547,17 @@ ObjectHandle<Class> ObjectShadowDataRepository::handleForObject(Class *obj)
 
     if (self->m_objectToWrapperPrivateMap.contains(obj)) {
         d = self->m_objectToWrapperPrivateMap.value(obj).lock();
+
+        if (!d->isComplete<Class>()) {
+            // This happens if the handle for obj was first created as a handle to a base class of Class.
+            // In this case, the cache is incomplete and we need to expand it.
+
+            d->expandCache<>(obj);
+
+            IF_CONSTEXPR (!cachingDisabled<ObjectWrapper<Class>>::value) {
+                d->cache<Class>()->update(d.get());
+            }
+        }
     } else {
         d = ObjectWrapperPrivate::create(obj);
         self->m_objectToWrapperPrivateMap.insert(obj, std::weak_ptr<ObjectWrapperPrivate> { d });

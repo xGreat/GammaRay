@@ -675,6 +675,29 @@ private slots:
 
     }
 
+    void testExtendingCaches()
+    {
+        MultiInheritanceTestObject t {1, 2, 3, 4.0, 5};
+        auto v = ObjectShadowDataRepository::handleForObject(static_cast<SimpleNonQObjectTestObject*>(&t));
+
+        QCOMPARE(v.object(), static_cast<SimpleNonQObjectTestObject*>(&t));
+        QCOMPARE(v->x(), t.x());
+        QCOMPARE(v->y(), t.y);
+
+
+        ObjectHandle<MultiInheritanceTestObject> w = ObjectShadowDataRepository::handleForObject(&t);
+        QCOMPARE(w->x(), t.x());
+        QCOMPARE(w->y(), t.y);
+        QCOMPARE(w->z(), t.z());
+        QCOMPARE(w->a(), t.a());
+        QCOMPARE(w->b(), t.b());
+
+        ObjectHandle<TestMixin> u = w;
+
+        QCOMPARE(u.object(), static_cast<TestMixin*>(&t));
+        QCOMPARE(u->a(), t.a());
+    }
+
     void testMisc()
     {
         ObjectHandle<SimpleNonQObjectTestObject> emptyHandle {};
