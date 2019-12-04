@@ -206,6 +206,16 @@ public:
     {
         return m_children;
     }
+    QObjectTestObject *nephew() const
+    {
+        if (parent()
+            && parent()->m_children.size()
+            && parent()->m_children[0]
+            && parent()->m_children[0]->m_children.size()) {
+            return parent()->m_children[0]->m_children[0];
+        }
+        return nullptr;
+    }
 
     QVector<QObjectTestObject *> m_children;
 
@@ -286,6 +296,7 @@ DECLARE_OBJECT_WRAPPER(QObjectTestObject,
                        CUSTOM_PROP(halloDu, object->echo("Hello, you."), CustomCommand)
                        RO_PROP(t, MemberVar | OwningPointer)
                        RO_PROP(children, Getter | OwningPointer)
+                       RO_PROP(nephew, Getter | OwningPointer | ForeignPointer)
                        RO_PROP(parent, Getter | NonOwningPointer)
                        CUSTOM_PROP(childrenCount, getChildrenCount(object), CustomCommand)
                        RO_PROP(hiddenVariable, DptrMember)
@@ -696,6 +707,23 @@ private slots:
 
         QCOMPARE(u.object(), static_cast<TestMixin*>(&t));
         QCOMPARE(u->a(), t.a());
+    }
+
+    void testForeignPointer()
+    {
+        QObjectTestObject t;
+        t.m_children = QVector<QObjectTestObject *> { new QObjectTestObject {1, 2, &t}, new QObjectTestObject {3, 4, &t} };
+        auto u = t.m_children.front();
+        u->m_children = QVector<QObjectTestObject *> { new QObjectTestObject {5, 6, u}, new QObjectTestObject {7, 8, u} };
+
+        ObjectHandle<QObjectTestObject> w = ObjectShadowDataRepository::handleForObject(&t);
+        auto v = w->children().back();
+
+        static_assert(std::is_same<decltype(w->nephew()), ObjectHandle<QObjectTestObject>>::value, "datatype of ForeignPointer property is incorrect.");
+
+        QVERIFY(v->nephew());
+        QCOMPARE(v->nephew()->x(), 5);
+        QCOMPARE(v->nephew()->y(), 6);
     }
 
     void testMisc()

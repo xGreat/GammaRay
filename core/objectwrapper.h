@@ -78,7 +78,8 @@ enum ObjectWrapperFlag {
     QProp = 128,
     OwningPointer = 256,
     NonOwningPointer = 512,
-    NonConst = 1024,
+    ForeignPointer = 1024,
+    NonConst = 2048,
 };
 
 
@@ -90,15 +91,16 @@ enum ObjectWrapperFlag {
  * This is internal for use in other macros.
  */
 #define DEFINE_GETTER(FieldName, StorageIndex, Flags) \
-decltype(fetch_##FieldName<Flags>(static_cast<value_type*>(nullptr))) FieldName() const \
+decltype(wrap<Flags>(fetch_##FieldName<Flags>(static_cast<value_type*>(nullptr)))) FieldName() const \
 { \
+    Q_ASSERT(d_ptr()); \
     d_ptr()->semaphore.acquire(); \
     QSemaphoreReleaser releaser { &d_ptr()->semaphore }; \
  \
     IF_CONSTEXPR (cachingDisabled<ThisClass_t>::value) { \
-        return fetch_##FieldName<Flags>(object()); \
+        return wrap<Flags>(fetch_##FieldName<Flags>(object())); \
     } else { \
-        return d_ptr()->cache<value_type>()->get< StorageIndex >(); \
+        return wrapPhase2<Flags>(d_ptr()->cache<value_type>()->get< StorageIndex >()); \
     } \
 } \
 
@@ -111,8 +113,9 @@ decltype(fetch_##FieldName<Flags>(static_cast<value_type*>(nullptr))) FieldName(
  * This is internal for use in other macros.
  */
 #define DEFINE_SETTER(FieldName, SetterName, StorageIndex, Flags) \
-void SetterName(decltype(fetch_##FieldName<Flags>(static_cast<value_type*>(nullptr))) newValue) \
+void SetterName(decltype(wrap<Flags>(fetch_##FieldName<Flags>(static_cast<value_type*>(nullptr)))) newValue) \
 { \
+    Q_ASSERT(d_ptr()); \
     d_ptr()->semaphore.acquire(); \
     QSemaphoreReleaser releaser { &d_ptr()->semaphore }; \
     \
@@ -137,51 +140,51 @@ void SetterName(decltype(fetch_##FieldName<Flags>(static_cast<value_type*>(nullp
 #define DEFINE_FETCH_FUNCTION_PROP(FieldName) \
 template<int Flags, typename T = pimplClass_t<ThisClass_t>, typename std::enable_if<(Flags & DptrGetter) != 0 && (Flags & NonConst) == 0>::type* = nullptr> \
 static auto fetch_##FieldName(const value_type *object) \
--> decltype(wrap<Flags>(std::declval<T>().FieldName())) \
+-> decltype(std::declval<T>().FieldName()) \
 { \
     static_assert(!std::is_same<T, void>::value, "Unknown Private Class: You need to add a PRIVATE_CLASS(...) macro to your wrapper definition."); /*FIXME can we make that assert actually effective instead of SFINAE?*/ \
-    return wrap<Flags>(static_cast<const T*>(T::get(object))->FieldName()); \
+    return static_cast<const T*>(T::get(object))->FieldName(); \
 } \
 template<int Flags, typename T = pimplClass_t<ThisClass_t>, typename std::enable_if<(Flags & DptrMember) != 0 && (Flags & NonConst) == 0>::type* = nullptr> \
 static auto fetch_##FieldName(const value_type *object) \
--> decltype(wrap<Flags>(std::declval<T>().FieldName)) \
+-> decltype(std::declval<T>().FieldName) \
 { \
     static_assert(!std::is_same<T, void>::value, "Unknown Private Class: You need to add a PRIVATE_CLASS(...) macro to your wrapper definition."); /*FIXME can we make that assert actually effective instead of SFINAE?*/ \
-    return wrap<Flags>(static_cast<const T*>(T::get(object))->FieldName); \
+    return static_cast<const T*>(T::get(object))->FieldName; \
 } \
 \
 template<int Flags, typename T = pimplClass_t<ThisClass_t>, typename std::enable_if<(Flags & DptrGetter) != 0 && (Flags & NonConst) != 0>::type* = nullptr> \
 static auto fetch_##FieldName(value_type *object) \
--> decltype(wrap<Flags>(std::declval<T>().FieldName())) \
+-> decltype(std::declval<T>().FieldName()) \
 { \
     static_assert(!std::is_same<T, void>::value, "Unknown Private Class: You need to add a PRIVATE_CLASS(...) macro to your wrapper definition."); /*FIXME can we make that assert actually effective instead of SFINAE?*/ \
-    return wrap<Flags>(static_cast<T*>(T::get(object))->FieldName()); \
+    return static_cast<T*>(T::get(object))->FieldName(); \
 } \
 template<int Flags, typename T = pimplClass_t<ThisClass_t>, typename std::enable_if<(Flags & DptrMember) != 0 && (Flags & NonConst) != 0>::type* = nullptr> \
 static auto fetch_##FieldName( value_type *object) \
--> decltype(wrap<Flags>(std::declval<T>().FieldName)) \
+-> decltype(std::declval<T>().FieldName) \
 { \
     static_assert(!std::is_same<T, void>::value, "Unknown Private Class: You need to add a PRIVATE_CLASS(...) macro to your wrapper definition."); /*FIXME can we make that assert actually effective instead of SFINAE?*/ \
-    return wrap<Flags>(static_cast<T*>(T::get(object))->FieldName); \
+    return static_cast<T*>(T::get(object))->FieldName; \
 } \
 \
 template<int Flags, typename T = value_type, typename std::enable_if<(Flags & Getter) != 0 && (Flags & NonConst) == 0>::type* = nullptr> \
 static auto fetch_##FieldName(const T *object) \
--> decltype(wrap<Flags>(std::declval<const T>().FieldName())) \
+-> decltype(std::declval<const T>().FieldName()) \
 { \
-    return wrap<Flags>(object->FieldName()); \
+    return object->FieldName(); \
 } \
 template<int Flags, typename T = value_type, typename std::enable_if<(Flags & Getter) != 0 && (Flags & NonConst) != 0>::type* = nullptr> \
 static auto fetch_##FieldName(T *object) \
--> decltype(wrap<Flags>(std::declval<T>().FieldName())) \
+-> decltype(std::declval<T>().FieldName()) \
 { \
-    return wrap<Flags>(object->FieldName()); \
+    return object->FieldName(); \
 } \
 template<int Flags, typename T = value_type, typename std::enable_if<(Flags & MemberVar) != 0>::type* = nullptr> \
 static auto fetch_##FieldName(const T *object) \
--> decltype(wrap<Flags>(std::declval<const T &>().FieldName)) \
+-> decltype(std::declval<const T &>().FieldName) \
 { \
-    return wrap<Flags>(object->FieldName); \
+    return object->FieldName; \
 } \
 
 /**
@@ -192,15 +195,15 @@ static auto fetch_##FieldName(const T *object) \
 #define DEFINE_FETCH_FUNCTION_CUSTOM_EXPRESSION(FieldName, Expr) \
 template<int Flags, typename T = value_type, typename std::enable_if<(Flags & NonConst) == 0>::type* = nullptr> \
 static auto fetch_##FieldName(const T *object) \
--> decltype(wrap<Flags>(Expr)) \
+-> decltype(Expr) \
 { \
-    return wrap<Flags>(Expr); \
+    return Expr; \
 } \
 template<int Flags, typename T = value_type, typename std::enable_if<(Flags & NonConst) != 0>::type* = nullptr> \
 static auto fetch_##FieldName(T *object) \
--> decltype(wrap<Flags>(Expr)) \
+-> decltype(Expr) \
 { \
-    return wrap<Flags>(Expr); \
+    return Expr; \
 } \
 
 
@@ -352,9 +355,9 @@ static void __connectToUpdates(ObjectWrapperPrivate *d, __number<W_COUNTER_##Fie
 #define RO_PROP(FieldName, Flags) \
 DEFINE_COUNTER(W_COUNTER_##FieldName, __data) \
 DEFINE_FETCH_FUNCTION_PROP(FieldName) \
-DATA_APPEND(W_COUNTER_##FieldName, typename std::decay<decltype(fetch_##FieldName<Flags>(static_cast<value_type*>(nullptr)))>::type, fetch_##FieldName<Flags>(d->object<value_type>())) \
+DATA_APPEND(W_COUNTER_##FieldName, typename std::decay<decltype(wrapPhase1<Flags>(fetch_##FieldName<Flags>(static_cast<value_type*>(nullptr))))>::type, wrapPhase1<Flags>(fetch_##FieldName<Flags>(d->object<value_type>()))) \
 DEFINE_GETTER(FieldName, W_COUNTER_##FieldName - 1, Flags) \
-ADD_TO_METAOBJECT(FieldName, decltype(fetch_##FieldName<Flags>(static_cast<value_type*>(nullptr))), Flags) \
+ADD_TO_METAOBJECT(FieldName, decltype(wrap<Flags>(fetch_##FieldName<Flags>(static_cast<value_type*>(nullptr)))), Flags) \
 CONNECT_TO_UPDATES(FieldName, Flags) \
 
 
@@ -397,10 +400,10 @@ CONNECT_TO_UPDATES(FieldName, Flags) \
 DEFINE_COUNTER(W_COUNTER_##FieldName, __data) \
 DEFINE_FETCH_FUNCTION_PROP(FieldName) \
 DEFINE_WRITE_FUNCTION_PROP(FieldName, SetterName) \
-DATA_APPEND(W_COUNTER_##FieldName, typename std::decay<decltype(fetch_##FieldName<Flags>(static_cast<value_type*>(nullptr)))>::type, fetch_##FieldName<Flags>(d->object<value_type>())) \
+DATA_APPEND(W_COUNTER_##FieldName, typename std::decay<decltype(wrapPhase1<Flags>(fetch_##FieldName<Flags>(static_cast<value_type*>(nullptr))))>::type, wrapPhase1<Flags>(fetch_##FieldName<Flags>(d->object<value_type>()))) \
 DEFINE_GETTER(FieldName, W_COUNTER_##FieldName - 1, Flags) \
 DEFINE_SETTER(FieldName, SetterName, W_COUNTER_##FieldName - 1, Flags) \
-ADD_TO_METAOBJECT(FieldName, decltype(fetch_##FieldName<Flags>(static_cast<value_type*>(nullptr))), Flags) \
+ADD_TO_METAOBJECT(FieldName, decltype(wrap<Flags>(fetch_##FieldName<Flags>(static_cast<value_type*>(nullptr)))), Flags) \
 CONNECT_TO_UPDATES(FieldName, Flags) \
 
 /**
@@ -437,9 +440,9 @@ CONNECT_TO_UPDATES(FieldName, Flags) \
 DEFINE_COUNTER(W_COUNTER_##FieldName, __data) \
 DEFINE_FETCH_FUNCTION_CUSTOM_EXPRESSION(FieldName, Expression) \
 DATA_APPEND(W_COUNTER_##FieldName, \
-typename std::decay<decltype(fetch_##FieldName<Flags | CustomCommand>(static_cast<value_type*>(nullptr)))>::type, fetch_##FieldName<Flags | CustomCommand>(d->object<value_type>())) \
-DEFINE_GETTER(FieldName, W_COUNTER_##FieldName - 1, Flags | CustomCommand) \
-ADD_TO_METAOBJECT(FieldName, decltype(fetch_##FieldName<Flags | CustomCommand>(static_cast<value_type*>(nullptr))), Flags | CustomCommand) \
+typename std::decay<decltype(wrapPhase1<Flags>(fetch_##FieldName<(Flags) | CustomCommand>(static_cast<value_type*>(nullptr))))>::type, wrapPhase1<Flags>(fetch_##FieldName<(Flags) | CustomCommand>(d->object<value_type>()))) \
+DEFINE_GETTER(FieldName, W_COUNTER_##FieldName - 1, (Flags) | CustomCommand) \
+ADD_TO_METAOBJECT(FieldName, decltype(wrap<Flags>(fetch_##FieldName<Flags | CustomCommand>(static_cast<value_type*>(nullptr)))), (Flags) | CustomCommand) \
 
 
 #define DIRECT_ACCESS_METHOD(MethodName) \
@@ -744,7 +747,7 @@ std::tuple<
 // stolen from boost
 template<class T, class U> std::unique_ptr<T> dynamic_pointer_cast( std::unique_ptr<U> && r ) noexcept
 {
-    (void) dynamic_cast< T* >( static_cast< U* >( 0 ) );
+    (void) dynamic_cast< T* >( static_cast< U* >( nullptr ) );
 
     static_assert( std::has_virtual_destructor<T>::value, "The target of dynamic_pointer_cast must have a virtual destructor." );
 
@@ -1231,7 +1234,150 @@ private:
     friend class ObjectWrapperTest;
 };
 
+// === Wrapping ===
 
+template<int flags, typename T>
+auto wrap(T &&value) -> typename std::enable_if<!isSpecialized<ObjectWrapper<typename std::decay<T>::type>>::value, T>::type
+{
+    return std::forward<T>(value);
+}
+template<int flags, typename T>
+auto wrap(T *object) -> second_t<typename ObjectWrapper<T>::value_type, typename std::enable_if<(flags & NonOwningPointer) != 0, ObjectView<T>>::type>
+{
+    return ObjectShadowDataRepository::viewForObject(object);
+}
+template<int flags, typename T>
+auto wrap(T *object) -> second_t<typename ObjectWrapper<T>::value_type, typename std::enable_if<(flags & OwningPointer) != 0, ObjectHandle<T>>::type>
+{
+    return ObjectShadowDataRepository::handleForObject(object);
+}
+template<int flags, typename T>
+auto wrap(QList<T*> list) -> second_t<typename ObjectWrapper<T>::value_type, typename std::enable_if<(flags & NonOwningPointer) != 0, QList<ObjectView<T>>>::type>
+{
+    QList<ObjectView<T>> handleList;
+    for (T *t : qAsConst(list)) {
+        handleList.push_back(ObjectShadowDataRepository::viewForObject(t));
+    }
+    //     std::transform(list.cbegin(), list.cend(), handleList.begin(), [](T *t) { return ObjectView<T> { t }; });
+    return handleList;
+}
+template<int flags, typename T>
+auto wrap(QList<T*> list) -> second_t<typename ObjectWrapper<T>::value_type, typename std::enable_if<(flags & OwningPointer) != 0, QList<ObjectHandle<T>>>::type>
+{
+    QList<ObjectHandle<T>> handleList;
+    for (T *t : qAsConst(list)) {
+        handleList.push_back(ObjectShadowDataRepository::handleForObject(t));
+    }
+    //     std::transform(list.cbegin(), list.cend(), handleList.begin(), [](T *t) { return ObjectView<T> { t }; });
+    return handleList;
+}
+template<int flags, typename T>
+auto wrap(QVector<T*> list) -> second_t<typename ObjectWrapper<T>::value_type, typename std::enable_if<(flags & NonOwningPointer) != 0, QVector<ObjectView<T>>>::type>
+{
+    QVector<ObjectView<T>> handleList;
+    handleList.reserve(list.size());
+    for (T *t : qAsConst(list)) {
+        handleList.push_back(ObjectShadowDataRepository::viewForObject(t));
+    }
+    //     std::transform(list.cbegin(), list.cend(), handleList.begin(), [](T *t) { return ObjectView<T> { t }; });
+    return handleList;
+}
+template<int flags, typename T>
+auto wrap(QVector<T*> list) -> second_t<typename ObjectWrapper<T>::value_type, typename std::enable_if<(flags & OwningPointer) != 0, QVector<ObjectHandle<T>>>::type>
+{
+    QVector<ObjectHandle<T>> handleList;
+    handleList.reserve(list.size());
+    for (T *t : qAsConst(list)) {
+        handleList.push_back(ObjectShadowDataRepository::handleForObject(t));
+    }
+    //     std::transform(list.cbegin(), list.cend(), handleList.begin(), [](T *t) { return ObjectView<T> { t }; });
+    return handleList;
+}
+
+
+template<int flags, typename T>
+auto wrapPhase1(T &&value) -> typename std::enable_if<(flags & ForeignPointer) != 0, T>::type
+{
+    return std::forward<T>(value);
+}
+template<int flags, typename T>
+auto wrapPhase1(T &&value) -> typename std::enable_if<(flags & ForeignPointer) == 0, decltype(wrap<flags>(std::forward<T>(value)))>::type
+{
+    return wrap<flags>(std::forward<T>(value));
+}
+
+template<int flags, typename T>
+auto wrapPhase2(T &&value) -> typename std::enable_if<(flags & ForeignPointer) == 0, decltype(std::forward<T>(value))>::type
+{
+    return std::forward<T>(value);
+}
+template<int flags, typename T>
+auto wrapPhase2(T &&value) -> typename std::enable_if<(flags & ForeignPointer) != 0, decltype(wrap<flags>(std::forward<T>(value)))>::type
+{
+    return wrap<flags>(std::forward<T>(value));
+}
+
+template<typename T, typename ...Args>
+auto unwrap(T && value, Args &&...dummy) -> decltype(std::forward<T>(value)) // Actually this is only supposed to support one argument, the variadic argument list is only to declare this as the fallback option.
+{
+    return std::forward<T>(value);
+}
+template<typename T>
+T *unwrap(const ObjectView<T> &object)
+{
+    return object.object();
+}
+template<typename T>
+T *unwrap(const ObjectHandle<T> &object)
+{
+    return object.object();
+}
+template<typename T>
+T *unwrap(ObjectView<T> &object)
+{
+    return object.object();
+}
+template<typename T>
+T *unwrap(ObjectHandle<T> &object)
+{
+    return object.object();
+}
+template<typename T>
+auto unwrap(QList<ObjectView<T>> list) -> QList<T*>
+{
+    QList<T*> unwrappedList;
+    for (const auto &t : qAsConst(list)) {
+        unwrappedList.push_back(t.object());
+    }
+    return unwrappedList;
+}
+template<typename T>
+auto unwrap(QList<ObjectHandle<T>> list) -> QList<T*>
+{
+    QList<T*> unwrappedList;
+    for (const auto &t : qAsConst(list)) {
+        unwrappedList.push_back(t.object());
+    }
+    return unwrappedList;
+}
+template<typename T>
+auto unwrap(QVector<ObjectView<T>> list) -> QVector<T*>
+{
+    QVector<T*> unwrappedList;
+    for (const auto &t : qAsConst(list)) {
+        unwrappedList.push_back(t.object());
+    }
+    return unwrappedList;
+}
+template<typename T>
+auto unwrap(QVector<ObjectHandle<T>> list) -> QVector<T*>
+{
+    QVector<T*> unwrappedList;
+    for (const auto &t : qAsConst(list)) {
+        unwrappedList.push_back(t.object());
+    }
+    return unwrappedList;
+}
 
 
 // === PropertyCache ===
@@ -1296,13 +1442,13 @@ void ObjectWrapperPrivate::connectToUpdates(CommandFunc_t fetchFunction, const c
         auto d = weakSelf.lock();
         d->semaphore.acquire();
         QSemaphoreReleaser releaser { d->semaphore };
-        d->cache<Class>()->template get<storageIndex>() = fetchFunction(d->object<Class>());
+        d->cache<Class>()->template get<storageIndex>() = wrapPhase1<Flags>(fetchFunction(d->object<Class>()));
     };
 
     auto connection = QObjectPrivate::connect(object,
-                                                prop.notifySignal().methodIndex(),
-                                                new QtPrivate::QFunctorSlotObjectWithNoArgs<decltype(f), void>(std::move(f)),
-                                                Qt::DirectConnection
+                                              prop.notifySignal().methodIndex(),
+                                              new QtPrivate::QFunctorSlotObjectWithNoArgs<decltype(f), void>(std::move(f)),
+                                              Qt::DirectConnection
     );
 
     connections.push_back(connection);
@@ -1585,126 +1731,6 @@ ObjectView<Class> ObjectShadowDataRepository::viewForObject(Class *obj)
     std::weak_ptr<ObjectWrapperPrivate> controlPtr =
         std::static_pointer_cast<ObjectWrapperPrivate>(controlBasePtr);
     return ObjectView<Class> { std::move(controlPtr) };
-}
-
-template<int flags, typename T>
-auto wrap(T &&value) -> typename std::enable_if<!isSpecialized<ObjectWrapper<typename std::decay<T>::type>>::value, T>::type
-{
-    return std::forward<T>(value);
-}
-template<int flags, typename T>
-auto wrap(T *object) -> second_t<typename ObjectWrapper<T>::value_type, typename std::enable_if<(flags & NonOwningPointer) != 0, ObjectView<T>>::type>
-{
-    return ObjectShadowDataRepository::viewForObject(object);
-}
-template<int flags, typename T>
-auto wrap(T *object) -> second_t<typename ObjectWrapper<T>::value_type, typename std::enable_if<(flags & OwningPointer) != 0, ObjectHandle<T>>::type>
-{
-    return ObjectShadowDataRepository::handleForObject(object);
-}
-template<int flags, typename T>
-auto wrap(QList<T*> list) -> second_t<typename ObjectWrapper<T>::value_type, typename std::enable_if<(flags & NonOwningPointer) != 0, QList<ObjectView<T>>>::type>
-{
-    QList<ObjectView<T>> handleList;
-    for (T *t : qAsConst(list)) {
-        handleList.push_back(ObjectShadowDataRepository::viewForObject(t));
-    }
-    //     std::transform(list.cbegin(), list.cend(), handleList.begin(), [](T *t) { return ObjectView<T> { t }; });
-    return handleList;
-}
-template<int flags, typename T>
-auto wrap(QList<T*> list) -> second_t<typename ObjectWrapper<T>::value_type, typename std::enable_if<(flags & OwningPointer) != 0, QList<ObjectHandle<T>>>::type>
-{
-    QList<ObjectHandle<T>> handleList;
-    for (T *t : qAsConst(list)) {
-        handleList.push_back(ObjectShadowDataRepository::handleForObject(t));
-    }
-    //     std::transform(list.cbegin(), list.cend(), handleList.begin(), [](T *t) { return ObjectView<T> { t }; });
-    return handleList;
-}
-template<int flags, typename T>
-auto wrap(QVector<T*> list) -> second_t<typename ObjectWrapper<T>::value_type, typename std::enable_if<(flags & NonOwningPointer) != 0, QVector<ObjectView<T>>>::type>
-{
-    QVector<ObjectView<T>> handleList;
-    handleList.reserve(list.size());
-    for (T *t : qAsConst(list)) {
-        handleList.push_back(ObjectShadowDataRepository::viewForObject(t));
-    }
-    //     std::transform(list.cbegin(), list.cend(), handleList.begin(), [](T *t) { return ObjectView<T> { t }; });
-    return handleList;
-}
-template<int flags, typename T>
-auto wrap(QVector<T*> list) -> second_t<typename ObjectWrapper<T>::value_type, typename std::enable_if<(flags & OwningPointer) != 0, QVector<ObjectHandle<T>>>::type>
-{
-    QVector<ObjectHandle<T>> handleList;
-    handleList.reserve(list.size());
-    for (T *t : qAsConst(list)) {
-        handleList.push_back(ObjectShadowDataRepository::handleForObject(t));
-    }
-    //     std::transform(list.cbegin(), list.cend(), handleList.begin(), [](T *t) { return ObjectView<T> { t }; });
-    return handleList;
-}
-
-template<typename T, typename ...Args>
-auto unwrap(T && value, Args &&...dummy) -> decltype(std::forward<T>(value)) // Actually this is only supposed to support one argument, the variadic argument list is only to declare this as the fallback option.
-{
-    return std::forward<T>(value);
-}
-template<typename T>
-T *unwrap(const ObjectView<T> &object)
-{
-    return object.object();
-}
-template<typename T>
-T *unwrap(const ObjectHandle<T> &object)
-{
-    return object.object();
-}
-template<typename T>
-T *unwrap(ObjectView<T> &object)
-{
-    return object.object();
-}
-template<typename T>
-T *unwrap(ObjectHandle<T> &object)
-{
-    return object.object();
-}
-template<typename T>
-auto unwrap(QList<ObjectView<T>> list) -> QList<T*>
-{
-    QList<T*> unwrappedList;
-    for (T *t : qAsConst(list)) {
-        unwrappedList.push_back(t.object());
-    }
-    return unwrappedList;
-}
-template<typename T>
-auto unwrap(QList<ObjectHandle<T>> list) -> QList<T*>
-{
-    QList<T*> unwrappedList;
-    for (T *t : qAsConst(list)) {
-        unwrappedList.push_back(t.object());
-    }
-    return unwrappedList;
-}
-template<typename T>
-auto unwrap(QVector<ObjectView<T>> list) -> QVector<T*>
-{
-    QVector<T*> unwrappedList;
-    for (T *t : qAsConst(list)) {
-        unwrappedList.push_back(t.object());
-    }
-    return unwrappedList;
-}
-template<typename T>
-auto unwrap(QVector<ObjectHandle<T>> list) -> QVector<T*>
-{
-    QVector<T*> unwrappedList;
-    for (T *t : qAsConst(list)) {
-        unwrappedList.push_back(t.object());
-    }
-    return unwrappedList;
 }
 
 }
