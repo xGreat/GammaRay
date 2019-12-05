@@ -1018,6 +1018,7 @@ class ObjectHandle
 
     explicit ObjectHandle(std::shared_ptr<ObjectWrapperPrivate> controlBlock);
     explicit ObjectHandle(ObjectWrapper<T> wrapper) : m_d(std::move(wrapper)) {}
+    /*implicit*/ ObjectHandle(std::nullptr_t) {}
     ObjectHandle() = default;
 
 
@@ -1125,6 +1126,7 @@ class ObjectView
 {
 public:
     ObjectView() = default;
+    /*implicit*/ ObjectView(std::nullptr_t) {}
     explicit ObjectView(std::weak_ptr<ObjectWrapperPrivate> controlBlock);
     explicit operator bool() const;
 
