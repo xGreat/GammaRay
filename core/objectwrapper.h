@@ -130,6 +130,29 @@ void SetterName(decltype(wrap<Flags>(fetch_##FieldName<Flags>(static_cast<value_
 
 
 /**
+ * Defines a getter function with the name @p FieldName, which returns the data
+ * stored at index @p StorageIndex in d->dataStorage or - in the
+ * non-caching case - the live value of the property.
+ *
+ * This is internal for use in other macros.
+ */
+#define DEFINE_REFRESH_PROPERTY(FieldName, StorageIndex, Flags) \
+void refresh_##FieldName() \
+{ \
+    Q_ASSERT(d_ptr()); \
+    IF_CONSTEXPR (cachingDisabled<ThisClass_t>::value) { \
+        return; \
+    } \
+    \
+    d_ptr()->semaphore.acquire(); \
+    QSemaphoreReleaser releaser { &d_ptr()->semaphore }; \
+    \
+    d_ptr()->cache<value_type>()->get< StorageIndex >() \
+        = wrapPhase1<Flags>(fetch_##FieldName<Flags>(object())); \
+} \
+
+
+/**
  * Defines a wrapper function for direct access to the property, abstracting
  * away the different kinds of properties (getter, member variable, custom
  * command).  This differs from the DEFINE_GETTER in that the fetch function
@@ -357,6 +380,7 @@ DEFINE_COUNTER(W_COUNTER_##FieldName, __data) \
 DEFINE_FETCH_FUNCTION_PROP(FieldName) \
 DATA_APPEND(W_COUNTER_##FieldName, typename std::decay<decltype(wrapPhase1<Flags>(fetch_##FieldName<Flags>(static_cast<value_type*>(nullptr))))>::type, wrapPhase1<Flags>(fetch_##FieldName<Flags>(d->object<value_type>()))) \
 DEFINE_GETTER(FieldName, W_COUNTER_##FieldName - 1, Flags) \
+DEFINE_REFRESH_PROPERTY(FieldName, W_COUNTER_##FieldName - 1, Flags) \
 ADD_TO_METAOBJECT(FieldName, decltype(wrap<Flags>(fetch_##FieldName<Flags>(static_cast<value_type*>(nullptr)))), Flags) \
 CONNECT_TO_UPDATES(FieldName, Flags) \
 
@@ -403,6 +427,7 @@ DEFINE_WRITE_FUNCTION_PROP(FieldName, SetterName) \
 DATA_APPEND(W_COUNTER_##FieldName, typename std::decay<decltype(wrapPhase1<Flags>(fetch_##FieldName<Flags>(static_cast<value_type*>(nullptr))))>::type, wrapPhase1<Flags>(fetch_##FieldName<Flags>(d->object<value_type>()))) \
 DEFINE_GETTER(FieldName, W_COUNTER_##FieldName - 1, Flags) \
 DEFINE_SETTER(FieldName, SetterName, W_COUNTER_##FieldName - 1, Flags) \
+DEFINE_REFRESH_PROPERTY(FieldName, W_COUNTER_##FieldName - 1, Flags) \
 ADD_TO_METAOBJECT(FieldName, decltype(wrap<Flags>(fetch_##FieldName<Flags>(static_cast<value_type*>(nullptr)))), Flags) \
 CONNECT_TO_UPDATES(FieldName, Flags) \
 
@@ -442,6 +467,7 @@ DEFINE_FETCH_FUNCTION_CUSTOM_EXPRESSION(FieldName, Expression) \
 DATA_APPEND(W_COUNTER_##FieldName, \
 typename std::decay<decltype(wrapPhase1<Flags>(fetch_##FieldName<(Flags) | CustomCommand>(static_cast<value_type*>(nullptr))))>::type, wrapPhase1<Flags>(fetch_##FieldName<(Flags) | CustomCommand>(d->object<value_type>()))) \
 DEFINE_GETTER(FieldName, W_COUNTER_##FieldName - 1, (Flags) | CustomCommand) \
+DEFINE_REFRESH_PROPERTY(FieldName, W_COUNTER_##FieldName - 1, (Flags) | CustomCommand) \
 ADD_TO_METAOBJECT(FieldName, decltype(wrap<Flags>(fetch_##FieldName<Flags | CustomCommand>(static_cast<value_type*>(nullptr)))), (Flags) | CustomCommand) \
 
 
@@ -1176,6 +1202,8 @@ public:
 
     inline void clear();
 
+    inline void refresh();
+
 private:
     std::weak_ptr<ObjectWrapperPrivate> d;
 };
@@ -1672,6 +1700,12 @@ template<typename T>
 void ObjectView<T>::clear()
 {
     d.reset();
+}
+template<typename T>
+void ObjectView<T>::refresh()
+{
+    auto d_ptr = d.lock();
+    d_ptr->template cache<T>()->update(d_ptr.get());
 }
 
 // === ObjectShadowDataRepository ===
