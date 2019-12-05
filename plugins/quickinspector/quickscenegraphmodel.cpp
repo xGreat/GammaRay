@@ -78,6 +78,9 @@ void QuickSceneGraphModel::updateSGTree(bool emitSignals)
             updateSGTree(false);
         endResetModel();
     } else {
+        m_childParentMap[m_rootNode].clear();
+        m_parentChildMap[{}].resize(1);
+        m_parentChildMap[{}][0] = m_rootNode;
 
         populateFromNode(m_rootNode, emitSignals);
         collectItemNodes(m_window->contentItem());
@@ -130,41 +133,31 @@ int QuickSceneGraphModel::rowCount(const QModelIndex &parent) const
         return 0;
 
     auto parentNode = nodeForIndex(parent);
-    return parentNode->childCount();
+    return m_parentChildMap.value(parentNode).size();
 }
 
 QModelIndex QuickSceneGraphModel::parent(const QModelIndex &child) const
 {
     auto childNode = nodeForIndex(child);
-    if (!childNode)
-        return nullptr;
-
-    return indexForNode(childNode->parent());
+    return indexForNode(m_childParentMap.value(childNode));
 }
 
 QModelIndex QuickSceneGraphModel::index(int row, int column, const QModelIndex &parent) const
 {
-    if (!parent.isValid()) {
-        if (row == 0) {
-            return createIndex(row, column, m_rootNode.object());
-        } else {
-            return nullptr;
-        }
-    }
-
     auto parentNode = nodeForIndex(parent);
+    const auto children = m_parentChildMap.value(parentNode);
 
-    if (row < 0 || column < 0 || row >= parentNode->childCount() || column >= columnCount())
+    if (row < 0 || column < 0 || row >= children.size() || column >= columnCount())
         return {};
 
-    auto child = parentNode->children().at(row);
-
-    return createIndex(row, column, child.object());
+    return createIndex(row, column, children.at(row).object());
 }
 
 void QuickSceneGraphModel::clear()
 {
     m_rootNode.clear();
+    m_childParentMap.clear();
+    m_parentChildMap.clear();
 }
 
 // indexForNode() is expensive, so only use it when really needed
@@ -176,8 +169,8 @@ void QuickSceneGraphModel::populateFromNode(ObjectView<QSGNode> node, bool emitS
     if (!node)
         return;
 
-    QVector<ObjectHandle<QSGNode> > childList = node->children();
-    auto parentNode = node.object()->parent();
+    QVector<ObjectView<QSGNode> > &childList = m_parentChildMap[node];
+
     node->refresh_children();
     node->refresh_childCount(); // TODO maybe we should remove this property, to prevent the two properties to get out of sync...
     QVector<ObjectHandle<QSGNode> > newChildList = node->children();
@@ -189,12 +182,6 @@ void QuickSceneGraphModel::populateFromNode(ObjectView<QSGNode> node, bool emitS
 
     auto i = childList.begin();
     auto j = newChildList.constBegin();
-
-    auto rootOf = [](ObjectView<QSGNode> node) {
-        while (node && node->parent())
-            node = node->parent();
-        return node;
-    };
 
     while (i != childList.end() && j != newChildList.constEnd()) {
         if (i->object() < j->object()) { // handle deleted node
@@ -211,7 +198,7 @@ void QuickSceneGraphModel::populateFromNode(ObjectView<QSGNode> node, bool emitS
         } else if (i->object() > j->object()) { // handle added node
             GET_INDEX
             const auto idx = std::distance(childList.begin(), i);
-            if (rootOf(*j) == m_rootNode) { // move from elsewhere in our tree
+            if (m_childParentMap.contains(*j)) { // move from elsewhere in our tree
                 const auto sourceIdx = indexForNode(*j);
                 Q_ASSERT(sourceIdx.isValid());
 #if 0
@@ -227,10 +214,13 @@ void QuickSceneGraphModel::populateFromNode(ObjectView<QSGNode> node, bool emitS
                 if (emitSignals) {
                     beginRemoveRows(sourceIdx.parent(), sourceIdx.row(), sourceIdx.row());
                 }
+                m_parentChildMap[m_childParentMap.value(*j)].remove(sourceIdx.row());
+                m_childParentMap.remove(*j);
                 if (emitSignals) {
                     endRemoveRows();
                     beginInsertRows(myIndex, idx, idx);
                 }
+                m_childParentMap.insert(*j, node);
                 i = childList.insert(i, *j);
                 if (emitSignals) {
                     endInsertRows();
@@ -240,6 +230,7 @@ void QuickSceneGraphModel::populateFromNode(ObjectView<QSGNode> node, bool emitS
             } else { // entirely new
                 if (emitSignals)
                     beginInsertRows(myIndex, idx, idx);
+                m_childParentMap.insert(*j, node);
                 i = childList.insert(i, *j);
                 populateFromNode(*j, false);
                 if (emitSignals)
@@ -259,7 +250,7 @@ void QuickSceneGraphModel::populateFromNode(ObjectView<QSGNode> node, bool emitS
         GET_INDEX
         while (j != newChildList.constEnd()) {
             const auto newBegin = j;
-            while (j != newChildList.constEnd() && rootOf(*j) != m_rootNode)
+            while (j != newChildList.constEnd() && !m_childParentMap.contains(*j))
                 ++j;
 
             // newBegin to j - 1 is new, j is either moved or end
@@ -270,6 +261,7 @@ void QuickSceneGraphModel::populateFromNode(ObjectView<QSGNode> node, bool emitS
                     beginInsertRows(myIndex, idx, idx + count - 1);
                 }
                 for (auto it = newBegin; it != j; ++it) {
+                    m_childParentMap.insert(*it, node);
                     childList.append(*it);
                 }
                 for (auto it = newBegin; it != j; ++it)
@@ -278,7 +270,7 @@ void QuickSceneGraphModel::populateFromNode(ObjectView<QSGNode> node, bool emitS
                     endInsertRows();
             }
 
-            if (j != newChildList.constEnd() && rootOf(*j) == m_rootNode) { // one moved element, important to recheck if this is still a move, in case the above has removed it meanwhile...
+            if (j != newChildList.constEnd() && m_childParentMap.contains(*j)) { // one moved element, important to recheck if this is still a move, in case the above has removed it meanwhile...
                 const auto sourceIdx = indexForNode(*j);
                 Q_ASSERT(sourceIdx.isValid());
 #if 0
@@ -296,11 +288,14 @@ void QuickSceneGraphModel::populateFromNode(ObjectView<QSGNode> node, bool emitS
                 if (emitSignals) {
                     beginRemoveRows(sourceIdx.parent(), sourceIdx.row(), sourceIdx.row());
                 }
+                m_parentChildMap[m_childParentMap.value(*j)].remove(sourceIdx.row());
+                m_childParentMap.remove(*j);
                 if (emitSignals) {
                     endRemoveRows();
                     const auto idx = childList.size();
                     beginInsertRows(myIndex, idx, idx);
                 }
+                m_childParentMap.insert(*j, node);
                 childList.append(*j);
                 if (emitSignals) {
                     endInsertRows();
@@ -327,7 +322,7 @@ void QuickSceneGraphModel::populateFromNode(ObjectView<QSGNode> node, bool emitS
             endRemoveRows();
     }
 
-    Q_ASSERT(childList == newChildList);
+//     Q_ASSERT(childList == newChildList);
 }
 
 #undef GET_INDEX
@@ -342,6 +337,7 @@ void QuickSceneGraphModel::collectItemNodes(ObjectView<QQuickItem> item)
         return;
 
     ObjectView<QSGNode> itemNode { item->itemNodeInstance() };
+    m_itemItemNodeMap[item] = itemNode;
     m_itemNodeItemMap[itemNode] = item;
 
     foreach (ObjectView<QQuickItem> child, item->childItems())
@@ -353,14 +349,9 @@ QModelIndex QuickSceneGraphModel::indexForNode(ObjectView<QSGNode> node) const
     if (!node)
         return {};
 
-    ObjectView<QSGNode> parent = node->parent();
-    if (!parent) {
-        return createIndex(0, 0, node.object());
-    }
+    ObjectView<QSGNode> parent = m_childParentMap.value(node);
 
-    QVector<ObjectHandle<QSGNode>> siblings = parent->children();
-
-
+    const QVector<ObjectView<QSGNode> > &siblings = m_parentChildMap[parent];
     auto it = std::lower_bound(siblings.constBegin(), siblings.constEnd(), node);
     if (it == siblings.constEnd() || *it != node)
         return QModelIndex();
@@ -371,14 +362,14 @@ QModelIndex QuickSceneGraphModel::indexForNode(ObjectView<QSGNode> node) const
 
 ObjectView<QSGNode> QuickSceneGraphModel::sgNodeForItem(ObjectView<QQuickItem> item) const
 {
-    return item ? item->itemNodeInstance() : nullptr;
+    return m_itemItemNodeMap[item];
 }
 
 ObjectView<QQuickItem> QuickSceneGraphModel::itemForSgNode(ObjectView<QSGNode> node) const
 {
     while (node && !m_itemNodeItemMap.contains(node)) {
         // If there's no entry for node, take its parent
-        node = node->parent();
+        node = m_childParentMap[node];
     }
     return m_itemNodeItemMap[node];
 }
@@ -413,10 +404,10 @@ bool QuickSceneGraphModel::recursivelyFindChild(ObjectView<QSGNode> root, Object
 
 void QuickSceneGraphModel::pruneSubTree(ObjectView<QSGNode> node)
 {
-//     for (auto child : node->children())
-//         pruneSubTree(child);
-//     m_parentChildMap.remove(node);
-//     m_childParentMap.remove(node);
+    foreach (auto child, m_parentChildMap.value(node))
+        pruneSubTree(child);
+    m_parentChildMap.remove(node);
+    m_childParentMap.remove(node);
 }
 
 ObjectView<QSGNode> QuickSceneGraphModel::nodeForIndex(const QModelIndex& index) const

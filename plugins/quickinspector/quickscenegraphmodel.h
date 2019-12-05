@@ -84,6 +84,9 @@ private:
     ObjectHandle<QQuickWindow> m_window;
 
     ObjectHandle<QSGNode> m_rootNode;
+    QHash<ObjectView<QSGNode>, ObjectView<QSGNode>> m_childParentMap;
+    QHash<ObjectView<QSGNode>, QVector<ObjectView<QSGNode>> > m_parentChildMap;
+//     QHash<ObjectView<QQuickItem> , ObjectView<QSGNode> > m_itemItemNodeMap;
     QHash<ObjectView<QSGNode> , ObjectView<QQuickItem> > m_itemNodeItemMap;
 };
 }
