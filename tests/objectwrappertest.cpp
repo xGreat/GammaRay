@@ -285,7 +285,7 @@ DECLARE_OBJECT_WRAPPER(SimpleNonQObjectTestObject,
 )
 DECLARE_OBJECT_WRAPPER(NonConstGetterTestObject,
                        RO_PROP(x, Getter | NonConst)
-                       CUSTOM_PROP(y, object->x() * 2.0, NonConst)
+                       CUSTOM_PROP(y, int, object->x() * 2.0, NonConst)
 )
 DECLARE_OBJECT_WRAPPER(QTimer, RO_PROP(isActive, Getter))
 DECLARE_OBJECT_WRAPPER(QObjectTestObject,
@@ -293,12 +293,12 @@ DECLARE_OBJECT_WRAPPER(QObjectTestObject,
                        RO_PROP(x, Getter | QProp)
                        RW_PROP(y, setY, Getter | QProp)
                        RO_PROP(str, Getter | NonConst)
-                       CUSTOM_PROP(halloDu, object->echo("Hello, you."), CustomCommand)
+                       CUSTOM_PROP(halloDu, QString, object->echo("Hello, you."), CustomCommand)
                        RO_PROP(t, MemberVar | OwningPointer)
                        RO_PROP(children, Getter | OwningPointer)
                        RO_PROP(nephew, Getter | OwningPointer | ForeignPointer)
                        RO_PROP(parent, Getter | NonOwningPointer)
-                       CUSTOM_PROP(childrenCount, getChildrenCount(object), CustomCommand)
+                       CUSTOM_PROP(childrenCount, int, getChildrenCount(object), CustomCommand)
                        RO_PROP(hiddenVariable, DptrMember)
                        RO_PROP(hiddenVarStr, DptrGetter)
 )

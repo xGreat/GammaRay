@@ -215,16 +215,16 @@ static auto fetch_##FieldName(const T *object) \
  *
  * This is internal for use in other macros.
  */
-#define DEFINE_FETCH_FUNCTION_CUSTOM_EXPRESSION(FieldName, Expr) \
+#define DEFINE_FETCH_FUNCTION_CUSTOM_EXPRESSION(FieldName, Type, Expr) \
 template<int Flags, typename T = value_type, typename std::enable_if<(Flags & NonConst) == 0>::type* = nullptr> \
 static auto fetch_##FieldName(const T *object) \
--> decltype(Expr) \
+-> Type \
 { \
     return Expr; \
 } \
 template<int Flags, typename T = value_type, typename std::enable_if<(Flags & NonConst) != 0>::type* = nullptr> \
 static auto fetch_##FieldName(T *object) \
--> decltype(Expr) \
+-> Type \
 { \
     return Expr; \
 } \
@@ -461,9 +461,10 @@ CONNECT_TO_UPDATES(FieldName, Flags) \
  * the wrapper of QQuickItem, use `CUSTOM_PROP(id, Utils::getQmlId(object), CustomCommand)`.
  * Later, use wrapper.id() to access it.
  */
-#define CUSTOM_PROP(FieldName, Expression, Flags) \
+// FIXME: C++14 remove the argument `Type` again and use return type deduction, instead.
+#define CUSTOM_PROP(FieldName, Type, Expression, Flags) \
 DEFINE_COUNTER(W_COUNTER_##FieldName, __data) \
-DEFINE_FETCH_FUNCTION_CUSTOM_EXPRESSION(FieldName, Expression) \
+DEFINE_FETCH_FUNCTION_CUSTOM_EXPRESSION(FieldName, Type, Expression) \
 DATA_APPEND(W_COUNTER_##FieldName, \
 typename std::decay<decltype(wrapPhase1<Flags>(fetch_##FieldName<(Flags) | CustomCommand>(static_cast<value_type*>(nullptr))))>::type, wrapPhase1<Flags>(fetch_##FieldName<(Flags) | CustomCommand>(d->object<value_type>()))) \
 DEFINE_GETTER(FieldName, W_COUNTER_##FieldName - 1, (Flags) | CustomCommand) \
