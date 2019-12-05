@@ -74,7 +74,6 @@ private slots:
 
 private:
     void clear();
-    ObjectHandle<QSGNode> currentRootNode() const;
     void populateFromNode(ObjectView<QSGNode> node, bool emitSignals);
     void collectItemNodes(ObjectView<QQuickItem> item);
     bool recursivelyFindChild(ObjectView<QSGNode> root, ObjectView<QSGNode> child) const;
@@ -85,9 +84,6 @@ private:
     ObjectHandle<QQuickWindow> m_window;
 
     ObjectHandle<QSGNode> m_rootNode;
-    QHash<ObjectView<QSGNode>, ObjectView<QSGNode>> m_childParentMap;
-    QHash<ObjectView<QSGNode>, QVector<ObjectView<QSGNode>> > m_parentChildMap;
-    QHash<ObjectView<QQuickItem> , ObjectView<QSGNode> > m_itemItemNodeMap;
     QHash<ObjectView<QSGNode> , ObjectView<QQuickItem> > m_itemNodeItemMap;
 };
 }

@@ -124,13 +124,21 @@ DECLARE_OBJECT_WRAPPER(QSGRendererInterface,
 
 DECLARE_OBJECT_WRAPPER(QSGNode,
                        RO_PROP(parent, Getter | NonOwningPointer)
-                       RO_PROP(childCount, Getter)
                        RO_PROP(flags, Getter)
                        RO_PROP(isSubtreeBlocked, Getter)
                        RW_PROP(dirtyState, markDirty, Getter)
 
-                       RO_PROP(firstChild, Getter | OwningPointer)
-                       RO_PROP(nextSibling, Getter | OwningPointer)
+                       RO_PROP(childCount, Getter)
+//                        RO_PROP(firstChild, Getter | OwningPointer)
+//                        RO_PROP(nextSibling, Getter | OwningPointer)
+                       CUSTOM_PROP(children, QVector<QSGNode*>, ([object](){
+                           QVector<QSGNode*> childList;
+                           childList.reserve(object->childCount());
+                           for (auto childNode = object->firstChild(); childNode; childNode = childNode->nextSibling())
+                               childList.append(childNode);
+                           std::sort(childList.begin(), childList.end());
+                           return childList;
+                        }()), CustomCommand | OwningPointer )
 
                        RO_PROP(type, Getter)
 )
@@ -152,15 +160,15 @@ DECLARE_OBJECT_WRAPPER_WB(QQuickItem, QObject,
                           RO_PROP(isTextureProvider, Getter)
                           RW_PROP(keepMouseGrab, setKeepMouseGrab, Getter)
                           RW_PROP(keepTouchGrab, setKeepTouchGrab, Getter)
-                          CUSTOM_PROP(nextItemInFocusChain, object->isVisible() ? object->nextItemInFocusChain() : nullptr, CustomCommand | NonConst)
-                          CUSTOM_PROP(previousItemInFocusChain, object->isVisible() ? object->nextItemInFocusChain(false) : nullptr, CustomCommand | NonConst)
+                          CUSTOM_PROP(nextItemInFocusChain, QQuickItem *, object->isVisible() ? object->nextItemInFocusChain() : nullptr, CustomCommand | NonConst)
+                          CUSTOM_PROP(previousItemInFocusChain, QQuickItem *, object->isVisible() ? object->nextItemInFocusChain(false) : nullptr, CustomCommand | NonConst)
                           RO_PROP(scopedFocusItem, Getter)
 //                           RO_PROP(window, Getter)
 
                           RO_PROP(childItems, Getter | OwningPointer | QProp)
                           RO_PROP(childrenRect, Getter | NonConst)
 
-                          RO_PROP(itemNodeInstance, DptrMember | OwningPointer) // Explicitly avoid calling priv->itemNode() here, which would create a new node outside the scenegraph's behavior.
+                          RO_PROP(itemNodeInstance, DptrMember | OwningPointer | ForeignPointer) // Explicitly avoid calling priv->itemNode() here, which would create a new node outside the scenegraph's behavior.
 
                           RW_PROP(isVisible, setVisible, Getter)
                           RW_PROP(opacity, setOpacity, Getter)
@@ -202,11 +210,23 @@ DECLARE_OBJECT_WRAPPER_WB(QQuickWindow, QWindow,
     RO_PROP(contentItem, Getter | OwningPointer)
     RW_PROP(customRenderMode, setCustomRenderMode, DptrMember | NonConst)
     ASYNC_VOID_METHOD(update)
-    CUSTOM_PROP(qmlContext, QQmlEngine::contextForObject(object), CustomCommand)
+    CUSTOM_PROP(qmlContext, QQmlContext *, QQmlEngine::contextForObject(object), CustomCommand)
 
     RO_PROP(width, Getter)
     RO_PROP(height, Getter)
     RO_PROP(size, Getter)
+
+    CUSTOM_PROP(rootNode, QSGNode *, [object]() -> QSGNode * {
+        auto item = object->contentItem();
+        if (!item)
+            return nullptr;
+
+        QQuickItemPrivate *itemPriv = QQuickItemPrivate::get(item);
+        QSGNode *root = itemPriv->itemNode();
+        while (root->parent()) // Ensure that we really get the very root node.
+            root = root->parent();
+        return root;
+    }(), OwningPointer)
 )
 
 

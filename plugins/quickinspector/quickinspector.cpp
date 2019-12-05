@@ -421,6 +421,8 @@ void QuickInspector::selectWindow(ObjectHandle<QQuickWindow> window)
     }
 
     m_window = std::move(window);
+    m_rootNode = m_window->rootNode();
+
     m_itemModel->setWindow(m_window.object());
     m_sgModel->setWindow(m_window);
     m_remoteView->setEventReceiver(m_window.object());
@@ -448,7 +450,7 @@ void QuickInspector::selectItem(ObjectHandle<QQuickItem> item)
     const QModelIndexList indexList
         = model->match(model->index(0, 0),
                        ObjectModel::ObjectRole,
-                       QVariant::fromValue<ObjectView<QQuickItem> >(item), 1,
+                       QVariant::fromValue<QQuickItem *>(item.object()), 1,
                        Qt::MatchExactly | Qt::MatchRecursive | Qt::MatchWrap);
     if (indexList.isEmpty())
         return;
@@ -547,6 +549,7 @@ void QuickInspector::aboutToCleanSceneGraph()
 
 void QuickInspector::sceneGraphCleanedUp()
 {
+    m_rootNode = m_window->rootNode();
     m_sgModel->setWindow(m_window);
 }
 
@@ -729,12 +732,13 @@ void QuickInspector::setSlowMode(bool slow)
 void QuickInspector::itemSelectionChanged(const QItemSelection &selection)
 {
     const QModelIndex index = selection.value(0).topLeft();
-    m_currentItem = index.data(ObjectModel::ObjectRole).value<ObjectView<QQuickItem> >();
-    m_itemPropertyController->setObject(m_currentItem.object());
+    auto item = index.data(ObjectModel::ObjectRole).value<QQuickItem *>();
+    m_itemPropertyController->setObject(item);
+    m_currentItem = ObjectShadowDataRepository::viewForObject(item);
 
     // It might be that a sg-node is already selected that belongs to this item, but isn't the root
     // node of the Item. In this case we don't want to overwrite that selection.
-    if (m_sgModel->itemForSgNode(m_currentSgNode) != m_currentItem) {
+    if (m_currentItem && m_sgModel->itemForSgNode(m_currentSgNode) != m_currentItem) {
         m_currentSgNode = m_sgModel->sgNodeForItem(m_currentItem);
         const auto sourceIdx = m_sgModel->indexForNode(m_currentSgNode);
         auto proxy = qobject_cast<const QAbstractProxyModel *>(m_sgSelectionModel->model());
@@ -755,7 +759,8 @@ void QuickInspector::sgSelectionChanged(const QItemSelection &selection)
         return;
 
     const QModelIndex index = selection.first().topLeft();
-    m_currentSgNode = index.data(ObjectModel::ObjectRole).value<ObjectView<QSGNode> >();
+    auto node = index.data(ObjectModel::ObjectRole).value<QSGNode *>(); // TODO should this be QSGNode*, ObjectView<QSGNode> or ObjectId?
+    m_currentSgNode = ObjectShadowDataRepository::viewForObject(node);
     if (!m_sgModel->verifyNodeValidity(m_currentSgNode))
         return; // Apparently the node has been deleted meanwhile, so don't access it.
 

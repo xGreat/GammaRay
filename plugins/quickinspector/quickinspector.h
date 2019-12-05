@@ -160,6 +160,7 @@ private:
     std::unique_ptr<AbstractScreenGrabber> m_overlay;
     ObjectHandle<QQuickWindow> m_window;
     ObjectHandle<QQuickItem> m_currentItem;
+    ObjectHandle<QSGNode> m_rootNode;
     ObjectHandle<QSGNode> m_currentSgNode;
     QAbstractItemModel *m_windowModel;
     QuickItemModel *m_itemModel;
