@@ -998,6 +998,16 @@ template<typename T> bool operator!=(const ObjectHandle<T> &lhs, const ObjectVie
 template<typename T> bool operator==(const ObjectView<T> &lhs, const ObjectHandle<T> &rhs);
 template<typename T> bool operator!=(const ObjectView<T> &lhs, const ObjectHandle<T> &rhs);
 
+template<typename T> bool operator<(const ObjectHandle<T> &lhs, const ObjectView<T> &rhs);
+template<typename T> bool operator>(const ObjectHandle<T> &lhs, const ObjectView<T> &rhs);
+template<typename T> bool operator<=(const ObjectHandle<T> &lhs, const ObjectView<T> &rhs);
+template<typename T> bool operator>=(const ObjectHandle<T> &lhs, const ObjectView<T> &rhs);
+
+template<typename T> bool operator<(const ObjectView<T> &lhs, const ObjectHandle<T> &rhs);
+template<typename T> bool operator>(const ObjectView<T> &lhs, const ObjectHandle<T> &rhs);
+template<typename T> bool operator<=(const ObjectView<T> &lhs, const ObjectHandle<T> &rhs);
+template<typename T> bool operator>=(const ObjectView<T> &lhs, const ObjectHandle<T> &rhs);
+
 template<typename T>
 class ObjectHandle
 {
@@ -1040,6 +1050,14 @@ class ObjectHandle
     friend bool operator!= <T>(const ObjectHandle<T> &lhs, const ObjectView<T> &rhs);
     friend bool operator== <T>(const ObjectView<T> &lhs, const ObjectHandle<T> &rhs);
     friend bool operator!= <T>(const ObjectView<T> &lhs, const ObjectHandle<T> &rhs);
+    friend bool operator<  <T>(const ObjectHandle<T> &lhs, const ObjectView<T> &rhs);
+    friend bool operator>  <T>(const ObjectHandle<T> &lhs, const ObjectView<T> &rhs);
+    friend bool operator<= <T>(const ObjectHandle<T> &lhs, const ObjectView<T> &rhs);
+    friend bool operator>= <T>(const ObjectHandle<T> &lhs, const ObjectView<T> &rhs);
+    friend bool operator<  <T>(const ObjectView<T> &lhs, const ObjectHandle<T> &rhs);
+    friend bool operator>  <T>(const ObjectView<T> &lhs, const ObjectHandle<T> &rhs);
+    friend bool operator<= <T>(const ObjectView<T> &lhs, const ObjectHandle<T> &rhs);
+    friend bool operator>= <T>(const ObjectView<T> &lhs, const ObjectHandle<T> &rhs);
 
     friend bool operator<(const ObjectHandle<T> &lhs, const ObjectHandle<T> &rhs)
     {
@@ -1158,6 +1176,14 @@ public:
     friend bool operator!= <T>(const ObjectHandle<T> &lhs, const ObjectView<T> &rhs);
     friend bool operator== <T>(const ObjectView<T> &lhs, const ObjectHandle<T> &rhs);
     friend bool operator!= <T>(const ObjectView<T> &lhs, const ObjectHandle<T> &rhs);
+    friend bool operator<  <T>(const ObjectHandle<T> &lhs, const ObjectView<T> &rhs);
+    friend bool operator>  <T>(const ObjectHandle<T> &lhs, const ObjectView<T> &rhs);
+    friend bool operator<= <T>(const ObjectHandle<T> &lhs, const ObjectView<T> &rhs);
+    friend bool operator>= <T>(const ObjectHandle<T> &lhs, const ObjectView<T> &rhs);
+    friend bool operator<  <T>(const ObjectView<T> &lhs, const ObjectHandle<T> &rhs);
+    friend bool operator>  <T>(const ObjectView<T> &lhs, const ObjectHandle<T> &rhs);
+    friend bool operator<= <T>(const ObjectView<T> &lhs, const ObjectHandle<T> &rhs);
+    friend bool operator>= <T>(const ObjectView<T> &lhs, const ObjectHandle<T> &rhs);
 
 
     friend bool operator==(const ObjectView<T> &lhs, const ObjectView<T> &rhs)
@@ -1166,26 +1192,25 @@ public:
     }
     friend bool operator!=(const ObjectView<T> &lhs, const ObjectView<T> &rhs)
     {
-        // FIXME: Is owner_less actually enough for comparison?
-        return std::owner_less<std::weak_ptr<ObjectWrapperPrivate>>{}(lhs.d, rhs.d)
-        || std::owner_less<std::weak_ptr<ObjectWrapperPrivate>>{}(rhs.d, lhs.d);
+        // FIXME: Is owner_less actually enough for comparison? // No, we want the order after wrapping to be the same as unwrapped
+        return lhs.object() != rhs.object();
     }
 
     friend bool operator<(const ObjectView<T> &lhs, const ObjectView<T> &rhs)
     {
-        return std::owner_less<std::weak_ptr<ObjectWrapperPrivate>>{}(lhs.d, rhs.d);
+        return lhs.object() < rhs.object();
     }
     friend bool operator>(const ObjectView<T> &lhs, const ObjectView<T> &rhs)
     {
-        return std::owner_less<std::weak_ptr<ObjectWrapperPrivate>>{}(rhs.d, lhs.d);
+        return lhs.object() > rhs.object();
     }
     friend bool operator<=(const ObjectView<T> &lhs, const ObjectView<T> &rhs)
     {
-        return !std::owner_less<std::weak_ptr<ObjectWrapperPrivate>>{}(rhs.d, lhs.d);
+        return lhs.object() <= rhs.object();
     }
     friend bool operator>=(const ObjectView<T> &lhs, const ObjectView<T> &rhs)
     {
-        return !std::owner_less<std::weak_ptr<ObjectWrapperPrivate>>{}(lhs.d, rhs.d);
+        return lhs.object() >= rhs.object();
     }
 
     static ObjectView nullhandle();
@@ -1225,9 +1250,8 @@ template<typename T>
 bool operator!=(const ObjectHandle<T> &lhs, const ObjectView<T> &rhs)
 {
 //     return lhs.m_d.d_ptr() != rhs.d;
-    // FIXME: Is owner_less actually enough for comparison?
-    return std::owner_less<std::weak_ptr<ObjectWrapperPrivate>>{}(lhs.m_d.cloneD(), rhs.d)
-    || std::owner_less<std::weak_ptr<ObjectWrapperPrivate>>{}(rhs.d, lhs.m_d.cloneD());
+    // FIXME: Is owner_less actually enough for comparison? // No, we want the order after wrapping to be the same as unwrapped
+    return lhs.object() != rhs.object();
 }
 template<typename T>
 bool operator==(const ObjectView<T> &lhs, const ObjectHandle<T> &rhs)
@@ -1240,6 +1264,49 @@ bool operator!=(const ObjectView<T> &lhs, const ObjectHandle<T> &rhs)
 {
 //     return lhs.d != rhs.m_d.d_ptr();
     return rhs != lhs;
+}
+
+template<typename T>
+bool operator<(const ObjectHandle<T> &lhs, const ObjectView<T> &rhs)
+{
+    // FIXME: Is owner_less actually enough for comparison? // No, we want the order after wrapping to be the same as unwrapped
+    return lhs.object() < rhs.object();
+}
+template<typename T>
+bool operator>(const ObjectHandle<T> &lhs, const ObjectView<T> &rhs)
+{
+    return lhs.object() > rhs.object();
+}
+template<typename T>
+bool operator<=(const ObjectHandle<T> &lhs, const ObjectView<T> &rhs)
+{
+    return !(lhs > rhs);
+}
+template<typename T>
+bool operator>=(const ObjectHandle<T> &lhs, const ObjectView<T> &rhs)
+{
+    return !(lhs < rhs);
+}
+
+template<typename T>
+bool operator<(const ObjectView<T> &lhs, const ObjectHandle<T> &rhs)
+{
+    return lhs.object() < rhs.object();
+}
+template<typename T>
+bool operator>(const ObjectView<T> &lhs, const ObjectHandle<T> &rhs)
+{
+    return lhs.object() > rhs.object();
+}
+template<typename T>
+bool operator<=(const ObjectView<T> &lhs, const ObjectHandle<T> &rhs)
+{
+    return !(lhs > rhs);
+}
+template<typename T>
+bool operator>=(const ObjectView<T> &lhs, const ObjectHandle<T> &rhs)
+{
+    return !(lhs < rhs);
 }
 
 
