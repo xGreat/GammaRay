@@ -923,7 +923,8 @@ public:
     template<typename T>
     T *object() const
     {
-        return cache<T>()->m_object;
+        auto c = cache<T>();
+        return c ? c->m_object : nullptr;
     }
 
     MetaObject *metaObject() const
@@ -1499,7 +1500,7 @@ ObjectHandle<T>::operator bool() const
 template<typename T>
 ObjectHandle<T>::operator T*() const
 {
-    return m_d.object();
+    return object();
 }
 
 template<typename T>
@@ -1534,12 +1535,12 @@ T *ObjectHandle<T>::object() const
 template<typename T>
 T *ObjectHandle<T>::data() const
 {
-    return m_d.object();
+    return object();
 }
 template<typename T>
 ObjectId ObjectHandle<T>::objectId() const
 {
-    return ObjectId {m_d.object()};
+    return ObjectId {object()};
 }
 
 template<typename T>
@@ -1653,17 +1654,18 @@ ObjectWrapper<T> &ObjectView<T>::operator*()
 template<typename T>
 T *ObjectView<T>::object() const
 {
-    return d.lock()->template object<T>();
+    auto d_ptr = d.lock();
+    return d_ptr ? d_ptr->template object<T>() : nullptr;
 }
 template<typename T>
 T *ObjectView<T>::data() const
 {
-    return d.lock()->template object<T>();
+    return object();
 }
 template<typename T>
 ObjectId ObjectView<T>::objectId() const
 {
-    return ObjectId {d.lock()->template object<T>()};
+    return ObjectId {object()};
 }
 
 template<typename T>
