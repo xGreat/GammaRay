@@ -986,6 +986,19 @@ public:
     template<typename T, typename Func, typename ...Args>
     static auto call(T *object, Func &&f, Args &&...args) -> std::future<decltype((std::declval<T*>()->*f)(args...))>;
 
+
+    template<typename T>
+    static typename std::enable_if<std::is_base_of<QObject, T>::value, ObjectId>::type objectId(T *object)
+    {
+        return ObjectId {object};
+    }
+
+    template<typename T>
+    static typename std::enable_if<!std::is_base_of<QObject, T>::value, ObjectId>::type objectId(T *object)
+    {
+        return ObjectId { object, ObjectWrapper<T>::staticMetaObject()->className().toLatin1() }; // FIXME what's the correct encoding here?
+    }
+
 private:
     std::unique_ptr<PropertyCacheBase> m_cache;
 };
@@ -1638,7 +1651,7 @@ T *ObjectHandle<T>::data() const
 template<typename T>
 ObjectId ObjectHandle<T>::objectId() const
 {
-    return ObjectId {object()};
+    return ObjectWrapperPrivate::objectId(object());
 }
 
 template<typename T>
@@ -1763,7 +1776,7 @@ T *ObjectView<T>::data() const
 template<typename T>
 ObjectId ObjectView<T>::objectId() const
 {
-    return ObjectId {object()};
+    return ObjectWrapperPrivate::objectId(object());
 }
 
 template<typename T>

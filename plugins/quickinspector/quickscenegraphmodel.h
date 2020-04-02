@@ -61,13 +61,13 @@ public:
     int rowCount(const QModelIndex &parent = QModelIndex()) const override;
     QModelIndex parent(const QModelIndex &child) const override;
     QModelIndex index(int row, int column, const QModelIndex &parent) const override;
-    QModelIndex indexForNode(ObjectView<QSGNode> node) const;
+    QModelIndex indexForNode(ObjectId node) const;
     ObjectView<QSGNode> sgNodeForItem(ObjectView<QQuickItem> item) const;
     ObjectView<QQuickItem> itemForSgNode(ObjectView<QSGNode> node) const;
     bool verifyNodeValidity(ObjectView<QSGNode> node);
 
 signals:
-    void nodeDeleted(ObjectView<QSGNode> node);
+    void nodeDeleted(ObjectId node);
 
 private slots:
     void updateSGTree(bool emitSignals = true);
@@ -77,17 +77,16 @@ private:
     void populateFromNode(ObjectView<QSGNode> node, bool emitSignals);
     void collectItemNodes(ObjectView<QQuickItem> item);
     bool recursivelyFindChild(ObjectView<QSGNode> root, ObjectView<QSGNode> child) const;
-    void pruneSubTree(ObjectView<QSGNode> node);
+    void pruneSubTree(ObjectId nodeId);
 
     ObjectView<QSGNode> nodeForIndex(const QModelIndex &index) const;
 
     ObjectHandle<QQuickWindow> m_window;
 
     ObjectHandle<QSGNode> m_rootNode;
-    QHash<ObjectView<QSGNode>, ObjectView<QSGNode>> m_childParentMap;
-    QHash<ObjectView<QSGNode>, QVector<ObjectView<QSGNode>> > m_parentChildMap;
-//     QHash<ObjectView<QQuickItem> , ObjectView<QSGNode> > m_itemItemNodeMap;
-    QHash<ObjectView<QSGNode> , ObjectView<QQuickItem> > m_itemNodeItemMap;
+    QHash<ObjectId, ObjectId> m_childParentMap;
+    QHash<ObjectId, QVector<ObjectId> > m_parentChildMap;
+    QHash<ObjectId, ObjectView<QQuickItem> > m_itemNodeItemMap;
 };
 }
 

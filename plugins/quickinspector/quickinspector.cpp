@@ -740,7 +740,7 @@ void QuickInspector::itemSelectionChanged(const QItemSelection &selection)
     // node of the Item. In this case we don't want to overwrite that selection.
     if (m_currentItem && m_sgModel->itemForSgNode(m_currentSgNode) != m_currentItem) {
         m_currentSgNode = m_sgModel->sgNodeForItem(m_currentItem);
-        const auto sourceIdx = m_sgModel->indexForNode(m_currentSgNode);
+        const auto sourceIdx = m_sgModel->indexForNode(m_currentSgNode.objectId());
         auto proxy = qobject_cast<const QAbstractProxyModel *>(m_sgSelectionModel->model());
         m_sgSelectionModel->select(proxy->mapFromSource(sourceIdx),
                                    QItemSelectionModel::Select
@@ -773,9 +773,9 @@ void QuickInspector::sgSelectionChanged(const QItemSelection &selection)
     selectItem(m_currentItem);
 }
 
-void QuickInspector::sgNodeDeleted(ObjectView<QSGNode> node)
+void QuickInspector::sgNodeDeleted(ObjectId node)
 {
-    if (m_currentSgNode == node)
+    if (m_currentSgNode.objectId() == node)
         m_sgPropertyController->setObject(nullptr, QString());
 }
 
@@ -858,7 +858,7 @@ void QuickInspector::scanForProblems()
 
     QMutexLocker lock(Probe::objectLock());
     for (QObject *obj : allObjects) {
-        ObjectView<QQuickItem> item = ObjectShadowDataRepository::viewForObject(obj);
+        ObjectHandle<QQuickItem> item = ObjectShadowDataRepository::handleForObject(qobject_cast<QQuickItem*>(obj));
         if (!item)
             continue;
 
@@ -896,7 +896,8 @@ bool QuickInspector::eventFilter(QObject *receiver, QEvent *event)
         QMouseEvent *mouseEv = static_cast<QMouseEvent*>(event);
         if (mouseEv->button() == Qt::LeftButton &&
                 mouseEv->modifiers() == (Qt::ControlModifier | Qt::ShiftModifier)) {
-            ObjectView<QQuickWindow> window = ObjectShadowDataRepository::viewForObject(receiver); // TODO possibly introduce an explicit objectview_cast for downcasts?
+            ObjectHandle<QQuickWindow> window =
+                ObjectShadowDataRepository::handleForObject(qobject_cast<QQuickWindow*>(receiver)); // TODO possibly introduce an explicit objectview_cast for downcasts?
             if (window && window->contentItem()) {
                 int bestCandidate;
                 const ObjectIds objects = recursiveItemsAt(window->contentItem(), mouseEv->pos(),

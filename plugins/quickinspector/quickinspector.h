@@ -135,7 +135,7 @@ private slots:
     void slotGrabWindow();
     void itemSelectionChanged(const QItemSelection &selection);
     void sgSelectionChanged(const QItemSelection &selection);
-    void sgNodeDeleted(ObjectView<QSGNode> node);
+    void sgNodeDeleted(ObjectId node);
     void qObjectSelected(QObject *object);
     void nonQObjectSelected(void *object, const QString &typeName);
     void objectCreated(QObject *object);
