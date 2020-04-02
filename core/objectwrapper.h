@@ -520,7 +520,7 @@ public: \
     using value_type = Class; \
     using ThisClass_t = ObjectWrapper<Class>; \
  \
-    __VA_ARGS__; \
+    __VA_ARGS__ \
  \
     static MetaObject *staticMetaObject() { \
         static auto mo = PropertyCache_t::createStaticMetaObject(QStringLiteral(#Class)); \
@@ -1146,12 +1146,14 @@ public:
     template<typename U = T>
     typename std::enable_if<!std::is_base_of<QObject, U>::value, bool>::type isValid() const
     {
-        return !d.expired() && d.lock()->template object<U>();
+        auto d_locked = d.lock();
+        return d_locked && d_locked->template object<U>();
     }
     template<typename U = T>
     typename std::enable_if<std::is_base_of<QObject, U>::value, bool>::type isValid() const
     {
-        return !d.expired() && Probe::instance()->isValidObject(d.lock()->template object<U>()); // FIXME we should not need to lock this just to do a null check
+        auto d_locked = d.lock();
+        return d_locked && Probe::instance()->isValidObject(d_locked->template object<U>()); // FIXME we should not need to lock this just to do a null check
     }
 
 
@@ -1240,6 +1242,7 @@ public:
     inline T *object() const;
     inline T *data() const;
     inline ObjectId objectId() const;
+    static MetaObject *staticMetaObject();
 
     inline void clear();
 
@@ -1789,6 +1792,12 @@ void ObjectView<T>::refresh()
 {
     auto d_ptr = d.lock();
     d_ptr->template cache<T>()->update(d_ptr.get());
+}
+
+template<typename T>
+MetaObject *ObjectView<T>::staticMetaObject()
+{
+    return ObjectWrapper<T>::staticMetaObject();
 }
 
 // === ObjectShadowDataRepository ===
