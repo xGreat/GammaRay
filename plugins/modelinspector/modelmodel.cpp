@@ -28,6 +28,8 @@
 
 #include "modelmodel.h"
 
+#include <common/commonutils.h>
+
 using namespace GammaRay;
 
 ModelModel::ModelModel(QObject *parent)
@@ -121,6 +123,7 @@ void ModelModel::objectAdded(QObject *obj)
     }
 }
 
+NO_SANITIZE(vptr) // QAbstractItemModel destructor has already run
 void ModelModel::objectRemoved(QObject *obj)
 {
     int index = m_models.indexOf(static_cast<QAbstractItemModel *>(obj));

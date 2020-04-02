@@ -43,6 +43,7 @@
 #include "quickimplicitbindingdependencyprovider.h"
 #endif
 
+#include <common/commonutils.h>
 #include <common/endpoint.h>
 #include <common/modelevent.h>
 #include <common/objectbroker.h>
@@ -651,6 +652,7 @@ public:
 
 
 // TODO How to get private API access from here to scenegraphwrapper?
+NO_SANITIZE(vptr)
 void QuickInspector::analyzePainting()
 {
 #if QT_VERSION >= QT_VERSION_CHECK(5, 9, 3)

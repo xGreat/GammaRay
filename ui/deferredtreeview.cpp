@@ -26,6 +26,7 @@
  */
 
 #include <config-gammaray.h>
+#include <common/commonutils.h>
 
 #include "deferredtreeview.h"
 #include "deferredtreeview_p.h"
@@ -53,7 +54,8 @@ HeaderView::HeaderView(Qt::Orientation orientation, QWidget *parent)
 {
 }
 
-bool HeaderView::isState(State state) const
+
+NO_SANITIZE(vptr) bool HeaderView::isState(State state) const
 {
     QHeaderViewPrivate *d = reinterpret_cast<QHeaderViewPrivate *>(d_ptr.data());
     return d->state == QHeaderViewPrivate::State(state);

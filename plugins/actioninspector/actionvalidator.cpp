@@ -34,6 +34,7 @@
 #include <core/objectdataprovider.h>
 #include <core/probe.h>
 #include <core/problemcollector.h>
+#include <common/commonutils.h>
 #include <common/problem.h>
 
 using namespace GammaRay;
@@ -115,6 +116,8 @@ void ActionValidator::safeRemove(QAction *action)
     }
 }
 
+NO_SANITIZE(vptr) // QAction destructor has already run, only a QObject is left
+                  // FIXME: Maybe safeRemove should take a QObject* or void*
 void ActionValidator::handleActionDestroyed(QObject *object)
 {
     QAction *action = static_cast<QAction *>(object);

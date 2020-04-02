@@ -32,6 +32,7 @@
 #include <core/probe.h>
 #include <core/qmetaobjectvalidator.h>
 
+#include <common/commonutils.h>
 #include <common/metatypedeclarations.h>
 #include <common/tools/metaobjectbrowser/qmetaobjectmodel.h>
 
@@ -77,7 +78,7 @@ public:
  *
  * @return Return true in case metaObject() does not point to staticMetaObject.
  */
-static inline bool hasDynamicMetaObject(const QObject *object)
+NO_SANITIZE(vptr) static inline bool hasDynamicMetaObject(const QObject *object)
 {
     return reinterpret_cast<const UnprotectedQObject *>(object)->data()->metaObject != nullptr;
 }

@@ -29,6 +29,7 @@
 #include "quickitemmodel.h"
 #include "quickitemmodelroles.h"
 
+#include <common/commonutils.h>
 #include <core/paintanalyzer.h>
 #include <core/probe.h>
 
@@ -241,6 +242,7 @@ void QuickItemModel::addItem(QQuickItem *item)
     endInsertRows();
 }
 
+NO_SANITIZE(vptr) // QQuickItem destructor has already run
 void QuickItemModel::objectRemoved(QObject *obj)
 {
     Q_ASSERT(thread() == QThread::currentThread());

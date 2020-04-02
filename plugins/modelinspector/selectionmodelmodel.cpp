@@ -28,6 +28,7 @@
 
 #include "selectionmodelmodel.h"
 
+#include <common/commonutils.h>
 #include <core/objectdataprovider.h>
 
 #include <QItemSelectionModel>
@@ -68,6 +69,7 @@ void SelectionModelModel::objectCreated(QObject* obj)
     endInsertRows();
 }
 
+NO_SANITIZE(vptr) // QAbstractItemModel destructor has already run
 void SelectionModelModel::objectDestroyed(QObject* obj)
 {
     Q_ASSERT(obj);
