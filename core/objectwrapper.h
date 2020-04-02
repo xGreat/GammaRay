@@ -1853,7 +1853,11 @@ ObjectView<Class> ObjectShadowDataRepository::viewForObject(Class *obj)
 
     auto self = instance();
 
-    Q_ASSERT_X(self->m_objectToWrapperPrivateMap.contains(obj), "viewForObject", "Obtaining a weak handle requires a (strong) handle to already exist.");
+//     Q_ASSERT_X(self->m_objectToWrapperPrivateMap.contains(obj), "viewForObject", "Obtaining a weak handle requires a (strong) handle to already exist.");
+
+    if (!self->m_objectToWrapperPrivateMap.contains(obj)) {
+        return nullptr;
+    }
 
     auto controlBasePtr = self->m_objectToWrapperPrivateMap.value(obj).lock();
     std::weak_ptr<ObjectWrapperPrivate> controlPtr =
