@@ -296,7 +296,7 @@ DECLARE_OBJECT_WRAPPER(QObjectTestObject,
                        CUSTOM_PROP(halloDu, QString, object->echo("Hello, you."), CustomCommand)
                        RO_PROP(t, MemberVar | OwningPointer)
                        RO_PROP(children, Getter | OwningPointer)
-                       RO_PROP(nephew, Getter | OwningPointer | ForeignPointer)
+                       RO_PROP(nephew, Getter | ForeignPointer)
                        RO_PROP(parent, Getter | NonOwningPointer)
                        CUSTOM_PROP(childrenCount, int, getChildrenCount(object), CustomCommand)
                        RO_PROP(hiddenVariable, DptrMember)
@@ -719,7 +719,7 @@ private slots:
         ObjectHandle<QObjectTestObject> w = ObjectShadowDataRepository::handleForObject(&t);
         auto v = w->children().back();
 
-        static_assert(std::is_same<decltype(w->nephew()), ObjectHandle<QObjectTestObject>>::value, "datatype of ForeignPointer property is incorrect.");
+        static_assert(std::is_same<decltype(w->nephew()), ObjectView<QObjectTestObject>>::value, "datatype of ForeignPointer property is incorrect.");
 
         QVERIFY(v->nephew());
         QCOMPARE(v->nephew()->x(), 5);

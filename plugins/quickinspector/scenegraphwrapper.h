@@ -168,7 +168,7 @@ DECLARE_OBJECT_WRAPPER_WB(QQuickItem, QObject,
                           RO_PROP(childItems, Getter | OwningPointer | QProp)
                           RO_PROP(childrenRect, Getter | NonConst)
 
-                          RO_PROP(itemNodeInstance, DptrMember | OwningPointer | ForeignPointer) // Explicitly avoid calling priv->itemNode() here, which would create a new node outside the scenegraph's behavior.
+                          RO_PROP(itemNodeInstance, DptrMember | ForeignPointer) // Explicitly avoid calling priv->itemNode() here, which would create a new node outside the scenegraph's behavior.
 
                           RW_PROP(isVisible, setVisible, Getter)
                           RW_PROP(opacity, setOpacity, Getter)

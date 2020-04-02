@@ -78,7 +78,8 @@ enum ObjectWrapperFlag {
     QProp = 128,
     OwningPointer = 256,
     NonOwningPointer = 512,
-    ForeignPointer = 1024,
+    ForeignPointerBit = 1024,
+    ForeignPointer = ForeignPointerBit | NonOwningPointer, // ForeignPointer implies NonOwning
     NonConst = 2048,
 };
 
@@ -1411,23 +1412,23 @@ auto wrap(QVector<T*> list) -> second_t<typename ObjectWrapper<T>::value_type, t
 
 
 template<int flags, typename T>
-auto wrapPhase1(T &&value) -> typename std::enable_if<(flags & ForeignPointer) != 0, T>::type
+auto wrapPhase1(T &&value) -> typename std::enable_if<(flags & ForeignPointerBit) != 0, T>::type
 {
     return std::forward<T>(value);
 }
 template<int flags, typename T>
-auto wrapPhase1(T &&value) -> typename std::enable_if<(flags & ForeignPointer) == 0, decltype(wrap<flags>(std::forward<T>(value)))>::type
+auto wrapPhase1(T &&value) -> typename std::enable_if<(flags & ForeignPointerBit) == 0, decltype(wrap<flags>(std::forward<T>(value)))>::type
 {
     return wrap<flags>(std::forward<T>(value));
 }
 
 template<int flags, typename T>
-auto wrapPhase2(T &&value) -> typename std::enable_if<(flags & ForeignPointer) == 0, decltype(std::forward<T>(value))>::type
+auto wrapPhase2(T &&value) -> typename std::enable_if<(flags & ForeignPointerBit) == 0, decltype(std::forward<T>(value))>::type
 {
     return std::forward<T>(value);
 }
 template<int flags, typename T>
-auto wrapPhase2(T &&value) -> typename std::enable_if<(flags & ForeignPointer) != 0, decltype(wrap<flags>(std::forward<T>(value)))>::type
+auto wrapPhase2(T &&value) -> typename std::enable_if<(flags & ForeignPointerBit) != 0, decltype(wrap<flags>(std::forward<T>(value)))>::type
 {
     return wrap<flags>(std::forward<T>(value));
 }
