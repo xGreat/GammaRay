@@ -1860,9 +1860,11 @@ ObjectView<Class> ObjectShadowDataRepository::viewForObject(Class *obj)
         return nullptr;
     }
 
-    auto controlBasePtr = self->m_objectToWrapperPrivateMap.value(obj).lock();
-    std::weak_ptr<ObjectWrapperPrivate> controlPtr =
-        std::static_pointer_cast<ObjectWrapperPrivate>(controlBasePtr);
+    auto controlPtr = self->m_objectToWrapperPrivateMap.value(obj).lock();
+    if (!controlPtr->template isComplete<Class>()) {
+        return ObjectView<Class> {};
+    }
+
     return ObjectView<Class> { std::move(controlPtr) };
 }
 
