@@ -122,6 +122,46 @@ DECLARE_OBJECT_WRAPPER(QSGRendererInterface,
 #endif
 
 
+namespace GammaRay {
+template<> inline QSGTransformNode *downcast<QSGTransformNode *, QSGNode*>(QSGNode *node)
+{
+    if (node->type() == QSGNode::TransformNodeType)
+        return static_cast<QSGTransformNode *>(node);
+    return nullptr;
+}
+template<> inline QSGGeometryNode *downcast<QSGGeometryNode *, QSGNode*>(QSGNode *node)
+{
+    if (node->type() == QSGNode::GeometryNodeType)
+        return static_cast<QSGGeometryNode *>(node);
+    return nullptr;
+}
+template<> inline QSGClipNode *downcast<QSGClipNode *, QSGNode*>(QSGNode *node)
+{
+    if (node->type() == QSGNode::ClipNodeType)
+        return static_cast<QSGClipNode *>(node);
+    return nullptr;
+}
+template<> inline QSGOpacityNode *downcast<QSGOpacityNode *, QSGNode*>(QSGNode *node)
+{
+    if (node->type() == QSGNode::OpacityNodeType)
+        return static_cast<QSGOpacityNode *>(node);
+    return nullptr;
+}
+template<> inline QSGRootNode *downcast<QSGRootNode *, QSGNode*>(QSGNode *node)
+{
+    if (node->type() == QSGNode::RootNodeType)
+        return static_cast<QSGRootNode *>(node);
+    return nullptr;
+}
+template<> inline QSGRenderNode *downcast<QSGRenderNode *, QSGNode*>(QSGNode *node)
+{
+    if (node->type() == QSGNode::RenderNodeType)
+        return static_cast<QSGRenderNode *>(node);
+    return nullptr;
+}
+
+}
+
 DECLARE_OBJECT_WRAPPER(QSGNode,
                        RO_PROP(parent, Getter | NonOwningPointer)
                        RO_PROP(flags, Getter)
