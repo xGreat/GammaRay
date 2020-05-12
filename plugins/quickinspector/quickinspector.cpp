@@ -860,28 +860,28 @@ void QuickInspector::scanForProblems()
 
     QMutexLocker lock(Probe::objectLock());
     for (QObject *obj : allObjects) {
-        ObjectHandle<QQuickItem> item = ObjectShadowDataRepository::handleForObject(qobject_cast<QQuickItem*>(obj));
+        auto item = qobject_cast<QQuickItem*>(obj);
         if (!item)
             continue;
 
-        ObjectView<QQuickItem> ancestor = item->parentItem();
+        auto ancestor = item->parentItem();
         auto rect = item->mapRectToScene(QRectF(0, 0, item->width(), item->height()));
 
-        while (ancestor && windowForItem(item) && ancestor != windowForItem(item)->contentItem()) {
-            if (ancestor->parentItem() == windowForItem(item)->contentItem() || ancestor->clip()) {
+        while (ancestor && item->window() && ancestor != item->window()->contentItem()) {
+            if (ancestor->parentItem() == item->window()->contentItem() || ancestor->clip()) {
                 auto ancestorRect = ancestor->mapRectToScene(QRectF(0, 0, ancestor->width(), ancestor->height()));
 
                 if (!ancestorRect.contains(rect) && !rect.intersects(ancestorRect)) {
                     Problem p;
                     p.severity = Problem::Info;
                     p.description = QStringLiteral("QtQuick: %1 %2 (0x%3) is visible, but out of view.").arg(
-                        ObjectDataProvider::typeName(item.object()),
-                        ObjectDataProvider::name(item.object()),
-                        QString::number(reinterpret_cast<quintptr>(item.object()), 16)
+                        ObjectDataProvider::typeName(item),
+                        ObjectDataProvider::name(item),
+                        QString::number(reinterpret_cast<quintptr>(item), 16)
                     );
-                    p.object = item.objectId();
-                    p.locations.push_back(ObjectDataProvider::creationLocation(item.object()));
-                    p.problemId = QStringLiteral("com.kdab.GammaRay.QuickItemChecker.OutOfView:%1").arg(reinterpret_cast<quintptr>(item.object()));
+                    p.object = ObjectId {item};
+                    p.locations.push_back(ObjectDataProvider::creationLocation(item));
+                    p.problemId = QStringLiteral("com.kdab.GammaRay.QuickItemChecker.OutOfView:%1").arg(reinterpret_cast<quintptr>(item));
                     p.findingCategory = Problem::Scan;
                     ProblemCollector::addProblem(p);
                     break;
