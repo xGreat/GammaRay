@@ -81,7 +81,6 @@ public:
 
 private:
     int m_z;
-
 };
 
 class TestMixin
@@ -114,6 +113,56 @@ public:
 
 private:
     int m_b;
+};
+
+
+class PolymorphicBaseTestObject {
+public:
+    PolymorphicBaseTestObject(int x, int y) : y(y), m_x(x) {}
+    virtual ~PolymorphicBaseTestObject() = default;
+
+    void setX(int x) { m_x = x; }
+
+    int x() const { return m_x; }
+    int y;
+
+private:
+    int m_x;
+};
+
+class DerivedPolymorphicTestObject : public PolymorphicBaseTestObject
+{
+public:
+    explicit DerivedPolymorphicTestObject(int x, int y, int z)
+        : PolymorphicBaseTestObject{x, y}, m_z{z}
+    {}
+
+    int z() const { return m_z; }
+    void setZ(int z) { m_z = z; }
+
+private:
+    int m_z;
+};
+
+struct CustomPolymorphyBaseClass {
+    CustomPolymorphyBaseClass(int x) : x(x) {}
+
+    enum Kind {
+        Base = 0,
+        Derived = 1
+    };
+    Kind kind = Base;
+    int x;
+};
+struct CustomPolymorphyDerivedClass : public CustomPolymorphyBaseClass
+{
+    explicit CustomPolymorphyDerivedClass(int x, int y)
+        : CustomPolymorphyBaseClass{x}, y{y}
+    {
+        kind = Derived;
+    }
+
+    int y;
 };
 
 // class Foo {
@@ -320,6 +369,35 @@ DECLARE_OBJECT_WRAPPER(TestMixin,
 DECLARE_OBJECT_WRAPPER_WB2(MultiInheritanceTestObject, DerivedTestObject, TestMixin,
                           RW_PROP(b, setB, Getter)
 )
+
+
+DECLARE_OBJECT_WRAPPER(PolymorphicBaseTestObject,
+                       RO_PROP(x, Getter)
+                       RW_PROP(y, setY, MemberVar)
+)
+DECLARE_OBJECT_WRAPPER_WB(DerivedPolymorphicTestObject, PolymorphicBaseTestObject,
+                       RW_PROP(z, setZ, Getter)
+)
+
+
+namespace GammaRay {
+template<>
+CustomPolymorphyDerivedClass *downcast<CustomPolymorphyDerivedClass *, CustomPolymorphyBaseClass*>(CustomPolymorphyBaseClass *obj)
+{
+    if (obj->kind == CustomPolymorphyBaseClass::Derived) {
+        return static_cast<CustomPolymorphyDerivedClass*>(obj);
+    }
+    return nullptr;
+}
+
+}
+DECLARE_OBJECT_WRAPPER(CustomPolymorphyBaseClass,
+                       RO_PROP(x, MemberVar)
+)
+DECLARE_OBJECT_WRAPPER_WB(CustomPolymorphyDerivedClass, CustomPolymorphyBaseClass,
+                       RO_PROP(y, MemberVar)
+)
+
 namespace GammaRay {
 
 class ObjectWrapperTest : public BaseProbeTest
@@ -599,6 +677,52 @@ private slots:
         QCOMPARE(v->y(), t.y);
 
         QCOMPARE(v->metaObject(), w->staticMetaObject());
+    }
+
+    void testPolymorphicInheritance()
+    {
+        static_assert(std::is_polymorphic<PolymorphicBaseTestObject>::value);
+
+        DerivedPolymorphicTestObject t {1, 2, 3};
+        ObjectHandle<PolymorphicBaseTestObject> v = ObjectShadowDataRepository::handleForObject(static_cast<PolymorphicBaseTestObject*>(&t));
+
+        QCOMPARE(v->x(), t.x());
+        QCOMPARE(v->y(), t.y);
+        QCOMPARE(v->metaObject(), ObjectWrapper<DerivedPolymorphicTestObject>::staticMetaObject());
+
+        ObjectHandle<DerivedPolymorphicTestObject> w = ObjectShadowDataRepository::handleForObject(&t);
+
+        QCOMPARE(w->x(), t.x());
+        QCOMPARE(w->y(), t.y);
+        QCOMPARE(w->z(), t.z());
+
+        ObjectHandle<PolymorphicBaseTestObject> v2 = w;
+
+        QCOMPARE(v2->x(), t.x());
+        QCOMPARE(v2->y(), t.y);
+
+        QCOMPARE(v2->metaObject(), w->staticMetaObject());
+    }
+
+    void testCustomPolymorphicInheritance()
+    {
+        static_assert(!std::is_polymorphic<CustomPolymorphyBaseClass>::value);
+
+        CustomPolymorphyDerivedClass t {1, 2};
+        ObjectHandle<CustomPolymorphyBaseClass> v = ObjectShadowDataRepository::handleForObject(static_cast<CustomPolymorphyBaseClass*>(&t));
+
+        QCOMPARE(v->x(), t.x);
+        QCOMPARE(v->metaObject(), ObjectWrapper<CustomPolymorphyDerivedClass>::staticMetaObject());
+
+        ObjectHandle<CustomPolymorphyDerivedClass> w = ObjectShadowDataRepository::handleForObject(&t);
+
+        QCOMPARE(w->x(), t.x);
+        QCOMPARE(w->y(), t.y);
+
+        ObjectHandle<CustomPolymorphyBaseClass> v2 = w;
+
+        QCOMPARE(v2->x(), t.x);
+        QCOMPARE(v2->metaObject(), w->staticMetaObject());
     }
 
 

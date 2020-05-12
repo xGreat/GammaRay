@@ -516,6 +516,21 @@ template<typename ...Args> void MethodName(Args &&...args) \
 #define PRIVATE_CLASS(PrivateClassName) using pimpl_t = PrivateClassName;
 
 
+
+#define DEFINE_FACTORY(Class) \
+static inline std::vector<std::shared_ptr<ObjectWrapperPrivate>(*)(void*)> s_subclassFactories;\
+
+
+#define DEFINE_FACTORY_WB(Class, BaseClass) \
+static inline std::vector<std::shared_ptr<ObjectWrapperPrivate>(*)(void*)> s_subclassFactories;\
+static inline auto s_create_from_ ## BaseClass ## _dummy = static_append_helper(ObjectWrapper<BaseClass>::s_subclassFactories, &ObjectWrapperPrivate::createFromBase<Class, BaseClass>);\
+
+#define DEFINE_FACTORY_WB2(Class, BaseClass1, BaseClass2) \
+static inline std::vector<std::shared_ptr<ObjectWrapperPrivate>(*)(void*)> s_subclassFactories;\
+static inline auto s_create_from_ ## BaseClass1 ## _dummy = static_append_helper(ObjectWrapper<BaseClass1>::s_subclassFactories, &ObjectWrapperPrivate::createFromBase<Class, BaseClass1>);\
+static inline auto s_create_from_ ## BaseClass2 ## _dummy = static_append_helper(ObjectWrapper<BaseClass2>::s_subclassFactories, &ObjectWrapperPrivate::createFromBase<Class, BaseClass2>);\
+
+
 #define OBJECT_WRAPPER_COMMON(Class, ...) \
 public: \
     using value_type = Class; \
@@ -574,11 +589,11 @@ public: \
  \
     void _clear() { d.reset(); } \
  \
- ObjectWrapperPrivate *d_ptr() const { return d.get(); } \
- std::shared_ptr<ObjectWrapperPrivate> cloneD() const { return d; } \
+    ObjectWrapperPrivate *d_ptr() const { return d.get(); } \
+    std::shared_ptr<ObjectWrapperPrivate> cloneD() const { return d; } \
  \
+    DEFINE_FACTORY(Class) \
     OBJECT_WRAPPER_COMMON(Class, __VA_ARGS__) \
- \
 protected: \
     std::shared_ptr<ObjectWrapperPrivate> d; \
 }; \
@@ -624,6 +639,7 @@ public: \
     ObjectWrapperPrivate *d_ptr() const { return d.get(); } \
     std::shared_ptr<ObjectWrapperPrivate> cloneD() const { return d; } \
  \
+    DEFINE_FACTORY_WB(Class, BaseClass) \
     OBJECT_WRAPPER_COMMON(Class, __VA_ARGS__) \
 private: \
 }; \
@@ -679,6 +695,7 @@ public: \
     ObjectWrapperPrivate *d_ptr() const { return ObjectWrapper<BaseClass1>::d.get(); } \
     std::shared_ptr<ObjectWrapperPrivate> cloneD() const { return ObjectWrapper<BaseClass1>::d; } \
     \
+    DEFINE_FACTORY_WB2(Class, BaseClass1, BaseClass2) \
     OBJECT_WRAPPER_COMMON(Class, __VA_ARGS__) \
 private: \
 }; \
@@ -714,7 +731,6 @@ template<typename T1, typename ...Rest> struct first
 template<typename ...Args> using first_t = typename first<Args...>::type;
 template<typename T1, typename T2> using second_t = T2;
 
-
 template<typename T, typename Enable = void>
 struct cachingDisabled : public std::false_type {};
 template<typename T>
@@ -736,6 +752,27 @@ struct pimplClass { using type = void; };
 template<typename T>
 struct pimplClass<T, void_t<typename T::pimpl_t>> { using type = typename T::pimpl_t; };
 template<typename T> using pimplClass_t = typename pimplClass<T>::type;
+
+// Customization point: You may specialize this for specific, non-polymorphic types.
+template<typename Derived_t, typename Base_t>
+auto downcast(Base_t b)
+    -> typename std::enable_if<std::is_polymorphic<typename std::remove_pointer<Base_t>::type>::value, Derived_t>::type
+{
+    return dynamic_cast<Derived_t>(b);
+}
+template<typename Derived_t, typename Base_t>
+auto downcast(Base_t b)
+    -> typename std::enable_if<!std::is_polymorphic<typename std::remove_pointer<Base_t>::type>::value, Derived_t>::type
+{
+    return nullptr;
+}
+
+template<typename T>
+T static_append_helper(std::vector<T> &v, T &&val)
+{
+    v.push_back(std::forward<decltype(val)>(val));
+    return val;
+}
 
 struct PropertyCacheBase
 {
@@ -968,6 +1005,16 @@ public:
 
     template<typename Class>
     static std::shared_ptr<ObjectWrapperPrivate> create(Class *object);
+
+    template<typename Class, typename BaseClass>
+    static std::shared_ptr<ObjectWrapperPrivate> createFromBase(void *obj)
+    {
+        auto p = GammaRay::downcast<Class*>(reinterpret_cast<BaseClass *>(obj));
+        if (p) {
+            return ObjectWrapperPrivate::create(p);
+        }
+        return nullptr;
+    }
 
     template<typename Class, int storageIndex, int Flags, typename CommandFunc_t, typename std::enable_if<!(Flags & QProp)>::type* = nullptr>
     void connectToUpdates(CommandFunc_t, const char*) {}
@@ -1528,13 +1575,29 @@ std::shared_ptr<ObjectWrapperPrivate> ObjectWrapperPrivate::create(Class *object
     }
     Q_ASSERT_X(checkCorrectThread(object), "ObjectHandle", "ObjectHandles can only be created from the thread which the wrapped QObject belongs to.");
 
+
+    // Use RRTI to see if we have a wrapper defined for the dynamic type of the object,
+    // if so, create and return that.
+    for (auto factory : ObjectWrapper<Class>::s_subclassFactories) {
+        auto p = factory(object);
+        if (p) {
+            return p;
+        }
+    }
+
     // Here, nobody else can have a reference to the cache objects yet, so we don't need to
     // guard the access with a semaphore. Also we're in object's thread, so we don't need to guard
     // against asynchronous deletions of object.
 
-    auto cache = make_unique<propertyCache_t<Class>>(object); // recursively creates all subclasses' caches
+    auto cache = make_unique<propertyCache_t<Class>>(object); // recursively creates all baseclasses' caches
     auto d = std::make_shared<ObjectWrapperPrivate>(std::move(cache));
     ObjectWrapper<Class>::__connectToUpdates(d.get(), __number<255>{});
+
+    ObjectShadowDataRepository::instance()->m_objectToWrapperPrivateMap.insert(object, std::weak_ptr<ObjectWrapperPrivate> { d });
+
+    IF_CONSTEXPR (!cachingDisabled<ObjectWrapper<Class>>::value) {
+        d->template cache<Class>()->update(d.get());
+    }
 
     return d;
 }
@@ -1835,11 +1898,6 @@ ObjectHandle<Class> ObjectShadowDataRepository::handleForObject(Class *obj)
         }
     } else {
         d = ObjectWrapperPrivate::create(obj);
-        self->m_objectToWrapperPrivateMap.insert(obj, std::weak_ptr<ObjectWrapperPrivate> { d });
-
-        IF_CONSTEXPR (!cachingDisabled<ObjectWrapper<Class>>::value) {
-            d->cache<Class>()->update(d.get());
-        }
     }
 
     return ObjectHandle<Class> { std::move(d) };
