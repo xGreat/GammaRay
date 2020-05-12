@@ -349,7 +349,7 @@ DECLARE_OBJECT_WRAPPER(QObjectTestObject,
                        RO_PROP(parent, Getter | NonOwningPointer)
                        CUSTOM_PROP(childrenCount, int, getChildrenCount(object), CustomCommand)
                        RO_PROP(hiddenVariable, DptrMember)
-                       RO_PROP(hiddenVarStr, DptrGetter)
+                       RO_PROP(hiddenVarStr, DptrGetter | NonConst) // NonConst necessary for Qt < 5.9
 )
 DECLARE_OBJECT_WRAPPER(LinkedList,
                        RO_PROP(i, Getter)
@@ -681,8 +681,6 @@ private slots:
 
     void testPolymorphicInheritance()
     {
-        static_assert(std::is_polymorphic<PolymorphicBaseTestObject>::value);
-
         DerivedPolymorphicTestObject t {1, 2, 3};
         ObjectHandle<PolymorphicBaseTestObject> v = ObjectShadowDataRepository::handleForObject(static_cast<PolymorphicBaseTestObject*>(&t));
 
@@ -706,8 +704,6 @@ private slots:
 
     void testCustomPolymorphicInheritance()
     {
-        static_assert(!std::is_polymorphic<CustomPolymorphyBaseClass>::value);
-
         CustomPolymorphyDerivedClass t {1, 2};
         ObjectHandle<CustomPolymorphyBaseClass> v = ObjectShadowDataRepository::handleForObject(static_cast<CustomPolymorphyBaseClass*>(&t));
 

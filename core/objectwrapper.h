@@ -31,6 +31,7 @@
 
 #include <core/probe.h>
 #include <common/objectid.h>
+#include <compat/qasconst.h>
 
 #include <QObject>
 #include <QMetaObject>
@@ -66,6 +67,25 @@ template<int i> class err;
  */
 #define IF_CONSTEXPR if
 
+#if QT_VERSION < QT_VERSION_CHECK(5, 10, 0)
+class QSemaphoreReleaser
+{
+public:
+    QSemaphoreReleaser() = default;
+    explicit QSemaphoreReleaser(QSemaphore &sem) noexcept
+        : m_sem(&sem) {}
+
+    ~QSemaphoreReleaser()
+    {
+        if (m_sem)
+            m_sem->release();
+    }
+private:
+    QSemaphore *m_sem = nullptr;
+};
+#endif
+
+
 
 enum ObjectWrapperFlag {
     NoFlags = 0,
@@ -96,7 +116,7 @@ decltype(wrap<Flags>(fetch_##FieldName<Flags>(static_cast<value_type*>(nullptr))
 { \
     Q_ASSERT(d_ptr()); \
     d_ptr()->semaphore.acquire(); \
-    QSemaphoreReleaser releaser { &d_ptr()->semaphore }; \
+    QSemaphoreReleaser releaser { d_ptr()->semaphore }; \
  \
     IF_CONSTEXPR (cachingDisabled<ThisClass_t>::value) { \
         return wrap<Flags>(fetch_##FieldName<Flags>(object())); \
@@ -118,7 +138,7 @@ void SetterName(decltype(wrap<Flags>(fetch_##FieldName<Flags>(static_cast<value_
 { \
     Q_ASSERT(d_ptr()); \
     d_ptr()->semaphore.acquire(); \
-    QSemaphoreReleaser releaser { &d_ptr()->semaphore }; \
+    QSemaphoreReleaser releaser { d_ptr()->semaphore }; \
     \
     IF_CONSTEXPR (cachingDisabled<ThisClass_t>::value) { \
         write_##FieldName<Flags>(object(), unwrap(newValue)); \
@@ -146,7 +166,7 @@ void refresh_##FieldName() \
     } \
     \
     d_ptr()->semaphore.acquire(); \
-    QSemaphoreReleaser releaser { &d_ptr()->semaphore }; \
+    QSemaphoreReleaser releaser { d_ptr()->semaphore }; \
     \
     d_ptr()->cache<value_type>()->get< StorageIndex >() \
         = wrapPhase1<Flags>(fetch_##FieldName<Flags>(object())); \
@@ -518,17 +538,17 @@ template<typename ...Args> void MethodName(Args &&...args) \
 
 
 #define DEFINE_FACTORY(Class) \
-static inline std::vector<std::shared_ptr<ObjectWrapperPrivate>(*)(void*)> s_subclassFactories;\
+static std::vector<std::shared_ptr<ObjectWrapperPrivate>(*)(void*)> GammaRay_ObjectWrapper_ ## Class ## _subclassFactories = {}; \
 
 
 #define DEFINE_FACTORY_WB(Class, BaseClass) \
-static inline std::vector<std::shared_ptr<ObjectWrapperPrivate>(*)(void*)> s_subclassFactories;\
-static inline auto s_create_from_ ## BaseClass ## _dummy = static_append_helper(ObjectWrapper<BaseClass>::s_subclassFactories, &ObjectWrapperPrivate::createFromBase<Class, BaseClass>);\
+static std::vector<std::shared_ptr<ObjectWrapperPrivate>(*)(void*)> GammaRay_ObjectWrapper_ ## Class ## _subclassFactories = {}; \
+static auto GammaRay_create_ ## Class ## _from_ ## BaseClass ## _dummy = static_append_helper(ObjectWrapper<BaseClass>::s_subclassFactories(), &ObjectWrapperPrivate::createFromBase<Class, BaseClass>);\
 
 #define DEFINE_FACTORY_WB2(Class, BaseClass1, BaseClass2) \
-static inline std::vector<std::shared_ptr<ObjectWrapperPrivate>(*)(void*)> s_subclassFactories;\
-static inline auto s_create_from_ ## BaseClass1 ## _dummy = static_append_helper(ObjectWrapper<BaseClass1>::s_subclassFactories, &ObjectWrapperPrivate::createFromBase<Class, BaseClass1>);\
-static inline auto s_create_from_ ## BaseClass2 ## _dummy = static_append_helper(ObjectWrapper<BaseClass2>::s_subclassFactories, &ObjectWrapperPrivate::createFromBase<Class, BaseClass2>);\
+static std::vector<std::shared_ptr<ObjectWrapperPrivate>(*)(void*)> GammaRay_ObjectWrapper_ ## Class ## _subclassFactories = {}; \
+static auto GammaRay_create_ ## Class ## _from_ ## BaseClass1 ## _dummy = static_append_helper(ObjectWrapper<BaseClass1>::s_subclassFactories(), &ObjectWrapperPrivate::createFromBase<Class, BaseClass1>);\
+static auto GammaRay_create_ ## Class ## _from_ ## BaseClass2 ## _dummy = static_append_helper(ObjectWrapper<BaseClass2>::s_subclassFactories(), &ObjectWrapperPrivate::createFromBase<Class, BaseClass2>);\
 
 
 #define OBJECT_WRAPPER_COMMON(Class, ...) \
@@ -549,6 +569,9 @@ public: \
  \
     explicit ObjectWrapper<Class>() = default; \
  \
+    static std::vector<std::shared_ptr<ObjectWrapperPrivate>(*)(void*)> &s_subclassFactories() \
+    { return GammaRay_ObjectWrapper_ ## Class ## _subclassFactories; } \
+ \
 private: \
     friend class ObjectWrapperTest; \
     friend class ObjectHandle<Class>; \
@@ -568,6 +591,7 @@ private: \
  */
 #define DECLARE_OBJECT_WRAPPER(Class, ...) \
 namespace GammaRay { \
+DEFINE_FACTORY(Class) \
 template<> \
 class ObjectWrapper<Class> \
 { \
@@ -592,7 +616,6 @@ public: \
     ObjectWrapperPrivate *d_ptr() const { return d.get(); } \
     std::shared_ptr<ObjectWrapperPrivate> cloneD() const { return d; } \
  \
-    DEFINE_FACTORY(Class) \
     OBJECT_WRAPPER_COMMON(Class, __VA_ARGS__) \
 protected: \
     std::shared_ptr<ObjectWrapperPrivate> d; \
@@ -616,6 +639,7 @@ Q_DECLARE_METATYPE(GammaRay::ObjectView<Class>)
  */
 #define DECLARE_OBJECT_WRAPPER_WB(Class, BaseClass, ...) \
 namespace GammaRay { \
+DEFINE_FACTORY_WB(Class, BaseClass) \
 template<> \
 class ObjectWrapper<Class> : public ObjectWrapper<BaseClass> \
 { \
@@ -639,7 +663,6 @@ public: \
     ObjectWrapperPrivate *d_ptr() const { return d.get(); } \
     std::shared_ptr<ObjectWrapperPrivate> cloneD() const { return d; } \
  \
-    DEFINE_FACTORY_WB(Class, BaseClass) \
     OBJECT_WRAPPER_COMMON(Class, __VA_ARGS__) \
 private: \
 }; \
@@ -662,6 +685,7 @@ Q_DECLARE_METATYPE(GammaRay::ObjectView<Class>)
  */
 #define DECLARE_OBJECT_WRAPPER_WB2(Class, BaseClass1, BaseClass2, ...) \
 namespace GammaRay { \
+DEFINE_FACTORY_WB2(Class, BaseClass1, BaseClass2) \
 template<> \
 class ObjectWrapper<Class> : public ObjectWrapper<BaseClass1>, public ObjectWrapper<BaseClass2> \
 { \
@@ -695,7 +719,6 @@ public: \
     ObjectWrapperPrivate *d_ptr() const { return ObjectWrapper<BaseClass1>::d.get(); } \
     std::shared_ptr<ObjectWrapperPrivate> cloneD() const { return ObjectWrapper<BaseClass1>::d; } \
     \
-    DEFINE_FACTORY_WB2(Class, BaseClass1, BaseClass2) \
     OBJECT_WRAPPER_COMMON(Class, __VA_ARGS__) \
 private: \
 }; \
@@ -1578,7 +1601,7 @@ std::shared_ptr<ObjectWrapperPrivate> ObjectWrapperPrivate::create(Class *object
 
     // Use RRTI to see if we have a wrapper defined for the dynamic type of the object,
     // if so, create and return that.
-    for (auto factory : ObjectWrapper<Class>::s_subclassFactories) {
+    for (auto factory : ObjectWrapper<Class>::s_subclassFactories()) {
         auto p = factory(object);
         if (p) {
             return p;
@@ -1919,6 +1942,7 @@ ObjectView<Class> ObjectShadowDataRepository::viewForObject(Class *obj)
     }
 
     auto controlPtr = self->m_objectToWrapperPrivateMap.value(obj).lock();
+    Q_ASSERT(controlPtr->template isComplete<Class>());
     if (!controlPtr->template isComplete<Class>()) {
         return ObjectView<Class> {};
     }
