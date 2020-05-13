@@ -543,12 +543,12 @@ static std::vector<std::shared_ptr<ObjectWrapperPrivate>(*)(void*)> GammaRay_Obj
 
 #define DEFINE_FACTORY_WB(Class, BaseClass) \
 static std::vector<std::shared_ptr<ObjectWrapperPrivate>(*)(void*)> GammaRay_ObjectWrapper_ ## Class ## _subclassFactories = {}; \
-static auto GammaRay_create_ ## Class ## _from_ ## BaseClass ## _dummy = static_append_helper(ObjectWrapper<BaseClass>::s_subclassFactories(), &ObjectWrapperPrivate::createFromBase<Class, BaseClass>);\
+static auto GammaRay_create_ ## Class ## _from_ ## BaseClass ## _dummy = ObjectWrapper<BaseClass>::s_addSubclassFactory(&ObjectWrapperPrivate::createFromBase<Class, BaseClass>);\
 
 #define DEFINE_FACTORY_WB2(Class, BaseClass1, BaseClass2) \
 static std::vector<std::shared_ptr<ObjectWrapperPrivate>(*)(void*)> GammaRay_ObjectWrapper_ ## Class ## _subclassFactories = {}; \
-static auto GammaRay_create_ ## Class ## _from_ ## BaseClass1 ## _dummy = static_append_helper(ObjectWrapper<BaseClass1>::s_subclassFactories(), &ObjectWrapperPrivate::createFromBase<Class, BaseClass1>);\
-static auto GammaRay_create_ ## Class ## _from_ ## BaseClass2 ## _dummy = static_append_helper(ObjectWrapper<BaseClass2>::s_subclassFactories(), &ObjectWrapperPrivate::createFromBase<Class, BaseClass2>);\
+static auto GammaRay_create_ ## Class ## _from_ ## BaseClass1 ## _dummy = ObjectWrapper<BaseClass1>::s_addSubclassFactory(&ObjectWrapperPrivate::createFromBase<Class, BaseClass1>);\
+static auto GammaRay_create_ ## Class ## _from_ ## BaseClass2 ## _dummy = ObjectWrapper<BaseClass2>::s_addSubclassFactory(&ObjectWrapperPrivate::createFromBase<Class, BaseClass2>);\
 
 
 #define OBJECT_WRAPPER_COMMON(Class, ...) \
@@ -571,6 +571,8 @@ public: \
  \
     static std::vector<std::shared_ptr<ObjectWrapperPrivate>(*)(void*)> &s_subclassFactories() \
     { return GammaRay_ObjectWrapper_ ## Class ## _subclassFactories; } \
+    static int s_addSubclassFactory(std::shared_ptr<ObjectWrapperPrivate>(*factory)(void*)) \
+    { GammaRay_ObjectWrapper_ ## Class ## _subclassFactories.push_back(factory); return 0; } \
  \
 private: \
     friend class ObjectWrapperTest; \
@@ -788,13 +790,6 @@ auto downcast(Base_t b)
     -> typename std::enable_if<!std::is_polymorphic<typename std::remove_pointer<Base_t>::type>::value, Derived_t>::type
 {
     return nullptr;
-}
-
-template<typename T>
-T static_append_helper(std::vector<T> &v, T &&val)
-{
-    v.push_back(std::forward<decltype(val)>(val));
-    return val;
 }
 
 struct PropertyCacheBase
