@@ -1633,7 +1633,7 @@ void ObjectWrapperPrivate::connectToUpdates(CommandFunc_t fetchFunction, const c
 
     auto connection = QObjectPrivate::connect(object,
                                               prop.notifySignal().methodIndex(),
-                                              new QtPrivate::QFunctorSlotObjectWithNoArgs<decltype(f), void>(std::move(f)),
+                                              new QtPrivate::QFunctorSlotObject<decltype(f), 0, QtPrivate::List<>, void>(std::move(f)),
                                               Qt::DirectConnection
     );
 
