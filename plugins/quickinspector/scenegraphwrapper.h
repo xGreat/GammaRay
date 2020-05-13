@@ -109,16 +109,19 @@ Q_DECLARE_METATYPE(QVector<QSGNode::NodeType>)
 Q_DECLARE_METATYPE(QSGNode::NodeType)
 
 
-DECLARE_OBJECT_WRAPPER(QWindow) // TODO
-DECLARE_OBJECT_WRAPPER(QObject) // TODO
+DEFINE_OBJECT_WRAPPER(QWindow) // TODO
+OBJECT_WRAPPER_END(QWindow)
+
+DEFINE_OBJECT_WRAPPER(QObject) // TODO
+OBJECT_WRAPPER_END(QObject)
 
 #if QT_VERSION >= QT_VERSION_CHECK(5, 8, 0)
-DECLARE_OBJECT_WRAPPER(QSGRendererInterface,
+DEFINE_OBJECT_WRAPPER(QSGRendererInterface)
     RO_PROP(graphicsApi, Getter)
     RO_PROP(shaderCompilationType, Getter)
     RO_PROP(shaderSourceType, Getter)
     RO_PROP(shaderType, Getter)
-)
+OBJECT_WRAPPER_END(QSGRendererInterface)
 #endif
 
 
@@ -162,76 +165,76 @@ template<> inline QSGRenderNode *downcast<QSGRenderNode *, QSGNode*>(QSGNode *no
 
 }
 
-DECLARE_OBJECT_WRAPPER(QSGNode,
-                       RO_PROP(parent, Getter | NonOwningPointer)
-                       RO_PROP(flags, Getter)
-                       RO_PROP(isSubtreeBlocked, Getter)
-                       RW_PROP(dirtyState, markDirty, Getter)
+DEFINE_OBJECT_WRAPPER(QSGNode)
+    RO_PROP(parent, Getter | NonOwningPointer)
+    RO_PROP(flags, Getter)
+    RO_PROP(isSubtreeBlocked, Getter)
+    RW_PROP(dirtyState, markDirty, Getter)
 
-                       RO_PROP(childCount, Getter)
+    RO_PROP(childCount, Getter)
 //                        RO_PROP(firstChild, Getter | OwningPointer)
 //                        RO_PROP(nextSibling, Getter | OwningPointer)
-                       CUSTOM_PROP(children, QVector<QSGNode*>, ([object](){
-                           QVector<QSGNode*> childList;
-                           childList.reserve(object->childCount());
-                           for (auto childNode = object->firstChild(); childNode; childNode = childNode->nextSibling())
-                               childList.append(childNode);
-                           std::sort(childList.begin(), childList.end());
-                           return childList;
-                        }()), CustomCommand | OwningPointer )
+    CUSTOM_PROP(children, QVector<QSGNode*>, ([object](){
+        QVector<QSGNode*> childList;
+        childList.reserve(object->childCount());
+        for (auto childNode = object->firstChild(); childNode; childNode = childNode->nextSibling())
+            childList.append(childNode);
+        std::sort(childList.begin(), childList.end());
+        return childList;
+    }()), CustomCommand | OwningPointer )
 
-                       RO_PROP(type, Getter)
-)
+    RO_PROP(type, Getter)
+OBJECT_WRAPPER_END(QSGNode)
 
-DECLARE_OBJECT_WRAPPER_WB(QSGTransformNode, QSGNode,
-                          RW_PROP(matrix, setMatrix, Getter)
-                          RW_PROP(combinedMatrix, setCombinedMatrix, Getter)
-)
+DEFINE_OBJECT_WRAPPER_WB(QSGTransformNode, QSGNode)
+    RW_PROP(matrix, setMatrix, Getter)
+    RW_PROP(combinedMatrix, setCombinedMatrix, Getter)
+OBJECT_WRAPPER_END(QSGTransformNode)
 
 
-DECLARE_OBJECT_WRAPPER_WB(QQuickItem, QObject,
-                          PRIVATE_CLASS(QQuickItemPrivate)
-                          RW_PROP(acceptHoverEvents, setAcceptHoverEvents, Getter)
-                          RW_PROP(acceptedMouseButtons, setAcceptedMouseButtons, Getter)
-                          RW_PROP(cursor, setCursor, Getter)
-                          RW_PROP(filtersChildMouseEvents, setFiltersChildMouseEvents, Getter)
-                          RW_PROP(flags, setFlags, Getter)
-                          RO_PROP(isFocusScope, Getter)
-                          RO_PROP(isTextureProvider, Getter)
-                          RW_PROP(keepMouseGrab, setKeepMouseGrab, Getter)
-                          RW_PROP(keepTouchGrab, setKeepTouchGrab, Getter)
-                          CUSTOM_PROP(nextItemInFocusChain, QQuickItem *, object->isVisible() ? object->nextItemInFocusChain() : nullptr, CustomCommand | NonConst)
-                          CUSTOM_PROP(previousItemInFocusChain, QQuickItem *, object->isVisible() ? object->nextItemInFocusChain(false) : nullptr, CustomCommand | NonConst)
-                          RO_PROP(scopedFocusItem, Getter)
+DEFINE_OBJECT_WRAPPER_WB(QQuickItem, QObject)
+    PRIVATE_CLASS(QQuickItemPrivate)
+    RW_PROP(acceptHoverEvents, setAcceptHoverEvents, Getter)
+    RW_PROP(acceptedMouseButtons, setAcceptedMouseButtons, Getter)
+    RW_PROP(cursor, setCursor, Getter)
+    RW_PROP(filtersChildMouseEvents, setFiltersChildMouseEvents, Getter)
+    RW_PROP(flags, setFlags, Getter)
+    RO_PROP(isFocusScope, Getter)
+    RO_PROP(isTextureProvider, Getter)
+    RW_PROP(keepMouseGrab, setKeepMouseGrab, Getter)
+    RW_PROP(keepTouchGrab, setKeepTouchGrab, Getter)
+    CUSTOM_PROP(nextItemInFocusChain, QQuickItem *, object->isVisible() ? object->nextItemInFocusChain() : nullptr, CustomCommand | NonConst)
+    CUSTOM_PROP(previousItemInFocusChain, QQuickItem *, object->isVisible() ? object->nextItemInFocusChain(false) : nullptr, CustomCommand | NonConst)
+    RO_PROP(scopedFocusItem, Getter)
 //                           RO_PROP(window, Getter)
 
-                          RO_PROP(childItems, Getter | OwningPointer | QProp)
-                          RO_PROP(childrenRect, Getter | NonConst)
+    RO_PROP(childItems, Getter | OwningPointer | QProp)
+    RO_PROP(childrenRect, Getter | NonConst)
 
-                          RO_PROP(itemNodeInstance, DptrMember | ForeignPointer) // Explicitly avoid calling priv->itemNode() here, which would create a new node outside the scenegraph's behavior.
+    RO_PROP(itemNodeInstance, DptrMember | ForeignPointer) // Explicitly avoid calling priv->itemNode() here, which would create a new node outside the scenegraph's behavior.
 
-                          RW_PROP(isVisible, setVisible, Getter)
-                          RW_PROP(opacity, setOpacity, Getter)
-                          RW_PROP(clip, setClip, Getter)
+    RW_PROP(isVisible, setVisible, Getter)
+    RW_PROP(opacity, setOpacity, Getter)
+    RW_PROP(clip, setClip, Getter)
 
-                          RW_PROP(width, setWidth, Getter)
-                          RW_PROP(height, setHeight, Getter)
-                          RW_PROP(size, setSize, Getter)
-                          RW_PROP(x, setX, Getter)
-                          RW_PROP(y, setY, Getter)
-                          RW_PROP(z, setZ, Getter)
+    RW_PROP(width, setWidth, Getter)
+    RW_PROP(height, setHeight, Getter)
+    RW_PROP(size, setSize, Getter)
+    RW_PROP(x, setX, Getter)
+    RW_PROP(y, setY, Getter)
+    RW_PROP(z, setZ, Getter)
 
-                          RW_PROP(parentItem, setParentItem, Getter | NonOwningPointer)
-//                           RO_PROP(window, Getter) //FIXME how to solve cyclic properties?
-
-
-                          DIRECT_ACCESS_METHOD(mapToItem) // TODO is this sufficiently safe?
-                          DIRECT_ACCESS_METHOD(mapRectToScene)
-                          DIRECT_ACCESS_METHOD(contains)
-)
+    RW_PROP(parentItem, setParentItem, Getter | NonOwningPointer)
+//     RO_PROP(window, Getter) //FIXME how to solve cyclic properties?
 
 
-DECLARE_OBJECT_WRAPPER_WB(QQuickWindow, QWindow,
+    DIRECT_ACCESS_METHOD(mapToItem) // TODO is this sufficiently safe?
+    DIRECT_ACCESS_METHOD(mapRectToScene)
+    DIRECT_ACCESS_METHOD(contains)
+OBJECT_WRAPPER_END(QQuickItem)
+
+
+DEFINE_OBJECT_WRAPPER_WB(QQuickWindow, QWindow)
     PRIVATE_CLASS(QQuickWindowPrivate)
     RW_PROP(clearBeforeRendering, setClearBeforeRendering, Getter)
     RO_PROP(effectiveDevicePixelRatio, Getter)
@@ -267,25 +270,25 @@ DECLARE_OBJECT_WRAPPER_WB(QQuickWindow, QWindow,
             root = root->parent();
         return root;
     }(), OwningPointer)
-)
+OBJECT_WRAPPER_END(QQuickWindow)
 
 
-DECLARE_OBJECT_WRAPPER_WB(QQuickView, QQuickWindow,
+DEFINE_OBJECT_WRAPPER_WB(QQuickView, QQuickWindow)
     RO_PROP(engine, Getter)
     RO_PROP(errors, Getter)
     RO_PROP(initialSize, Getter)
     RO_PROP(rootContext, Getter)
     RO_PROP(rootObject, Getter)
-)
+OBJECT_WRAPPER_END(QQuickView)
 
-DECLARE_OBJECT_WRAPPER_WB(QQuickPaintedItem, QQuickItem,
+DEFINE_OBJECT_WRAPPER_WB(QQuickPaintedItem, QQuickItem)
     RO_PROP(contentsBoundingRect, Getter)
     RW_PROP(mipmap, setMipmap, Getter)
     RW_PROP(opaquePainting, setOpaquePainting, Getter)
     RW_PROP(performanceHints, setPerformanceHints, Getter)
-)
+OBJECT_WRAPPER_END(QQuickPaintedItem)
 
-DECLARE_OBJECT_WRAPPER_WB(QSGTexture, QObject,
+DEFINE_OBJECT_WRAPPER_WB(QSGTexture, QObject)
 #if QT_VERSION >= QT_VERSION_CHECK(5, 9, 0)
     RW_PROP(anisotropyLevel, setAnisotropyLevel, Getter)
 #endif
@@ -300,86 +303,90 @@ DECLARE_OBJECT_WRAPPER_WB(QSGTexture, QObject,
 //    RO_PROP(textureId, Getter)
     RO_PROP(textureSize, Getter)
     RW_PROP(verticalWrapMode, setVerticalWrapMode, Getter)
-)
+OBJECT_WRAPPER_END(QSGTexture)
 
-DECLARE_OBJECT_WRAPPER_WB(QSGBasicGeometryNode, QSGNode,
+DEFINE_OBJECT_WRAPPER_WB(QSGBasicGeometryNode, QSGNode)
     RO_PROP(geometry, Getter) // FIXME: This used to have the MSVC workaround
     RO_PROP(matrix, Getter)
     RO_PROP(clipList, Getter)
-)
+OBJECT_WRAPPER_END(QSGBasicGeometryNode)
 
-DECLARE_OBJECT_WRAPPER(QSGMaterial,
-                       RO_PROP(flags, Getter)
-)
+DEFINE_OBJECT_WRAPPER(QSGMaterial)
+    RO_PROP(flags, Getter)
+OBJECT_WRAPPER_END(QSGMaterial)
 
-DECLARE_OBJECT_WRAPPER_WB(QSGGeometryNode, QSGBasicGeometryNode,
+DEFINE_OBJECT_WRAPPER_WB(QSGGeometryNode, QSGBasicGeometryNode)
     RW_PROP(material, setMaterial, Getter)
     RW_PROP(opaqueMaterial, setOpaqueMaterial, Getter)
     RO_PROP(activeMaterial, Getter)
     RW_PROP(renderOrder, setRenderOrder, Getter)
     RW_PROP(inheritedOpacity, setInheritedOpacity, Getter)
-)
+OBJECT_WRAPPER_END(QSGGeometryNode)
 
-DECLARE_OBJECT_WRAPPER_WB(QSGClipNode, QSGBasicGeometryNode,
+DEFINE_OBJECT_WRAPPER_WB(QSGClipNode, QSGBasicGeometryNode)
     RW_PROP(isRectangular, setIsRectangular, Getter)
     RW_PROP(clipRect, setClipRect, Getter)
-)
+OBJECT_WRAPPER_END(QSGClipNode)
 
-DECLARE_OBJECT_WRAPPER_WB(QSGRootNode, QSGNode, )
+DEFINE_OBJECT_WRAPPER_WB(QSGRootNode, QSGNode)
+OBJECT_WRAPPER_END(QSGRootNode)
 
-DECLARE_OBJECT_WRAPPER_WB(QSGOpacityNode, QSGNode,
+DEFINE_OBJECT_WRAPPER_WB(QSGOpacityNode, QSGNode)
     RW_PROP(opacity, setOpacity, Getter)
     RW_PROP(combinedOpacity, setCombinedOpacity, Getter)
-)
+OBJECT_WRAPPER_END(QSGOpacityNode)
 
 #if QT_VERSION >= QT_VERSION_CHECK(5, 8, 0)
-DECLARE_OBJECT_WRAPPER_WB(QSGRenderNode, QSGNode,
+DEFINE_OBJECT_WRAPPER_WB(QSGRenderNode, QSGNode)
     RO_PROP(changedStates, Getter)
     RO_PROP(flags, Getter)
     RO_PROP(rect, Getter)
     RO_PROP(inheritedOpacity, Getter)
     RO_PROP(matrix, Getter)
     RO_PROP(clipList, Getter)
-)
+OBJECT_WRAPPER_END(QSGRenderNode)
 #endif
 
-DECLARE_OBJECT_WRAPPER_WB(QSGFlatColorMaterial, QSGMaterial,
+DEFINE_OBJECT_WRAPPER_WB(QSGFlatColorMaterial, QSGMaterial)
     RW_PROP(color, setColor, Getter)
-)
+OBJECT_WRAPPER_END(QSGFlatColorMaterial)
 
-DECLARE_OBJECT_WRAPPER_WB(QSGOpaqueTextureMaterial, QSGMaterial,
+DEFINE_OBJECT_WRAPPER_WB(QSGOpaqueTextureMaterial, QSGMaterial)
     RW_PROP(filtering, setFiltering, Getter)
     RW_PROP(horizontalWrapMode, setHorizontalWrapMode, Getter)
     RW_PROP(mipmapFiltering, setMipmapFiltering, Getter)
     RW_PROP(texture, setTexture, Getter)
     RW_PROP(verticalWrapMode, setVerticalWrapMode, Getter)
-)
-DECLARE_OBJECT_WRAPPER_WB(QSGTextureMaterial, QSGOpaqueTextureMaterial,)
+OBJECT_WRAPPER_END(QSGOpaqueTextureMaterial)
 
-DECLARE_OBJECT_WRAPPER_WB(QSGVertexColorMaterial, QSGMaterial,)
+DEFINE_OBJECT_WRAPPER_WB(QSGTextureMaterial, QSGOpaqueTextureMaterial)
+OBJECT_WRAPPER_END(QSGTextureMaterial)
+
+DEFINE_OBJECT_WRAPPER_WB(QSGVertexColorMaterial, QSGMaterial)
+OBJECT_WRAPPER_END(QSGVertexColorMaterial)
 
 #ifndef QT_NO_OPENGL
-DECLARE_OBJECT_WRAPPER_WB(QSGDistanceFieldTextMaterial, QSGMaterial,
+DEFINE_OBJECT_WRAPPER_WB(QSGDistanceFieldTextMaterial, QSGMaterial)
     RO_PROP(color, Getter)
     RO_PROP(fontScale, Getter)
     RO_PROP(textureSize, Getter)
-)
+OBJECT_WRAPPER_END(QSGDistanceFieldTextMaterial)
 
-DECLARE_OBJECT_WRAPPER_WB(QSGDistanceFieldStyledTextMaterial, QSGDistanceFieldTextMaterial,
+DEFINE_OBJECT_WRAPPER_WB(QSGDistanceFieldStyledTextMaterial, QSGDistanceFieldTextMaterial)
     RO_PROP(styleColor, Getter)
-)
+OBJECT_WRAPPER_END(QSGDistanceFieldStyledTextMaterial)
 
-DECLARE_OBJECT_WRAPPER_WB(QSGDistanceFieldShiftedStyleTextMaterial, QSGDistanceFieldStyledTextMaterial,
+DEFINE_OBJECT_WRAPPER_WB(QSGDistanceFieldShiftedStyleTextMaterial, QSGDistanceFieldStyledTextMaterial)
     RO_PROP(shift, Getter)
-)
+OBJECT_WRAPPER_END(QSGDistanceFieldShiftedStyleTextMaterial)
 
 #if QT_VERSION >= QT_VERSION_CHECK(5, 8, 0)
-DECLARE_OBJECT_WRAPPER_WB(QQuickOpenGLShaderEffectMaterial, QSGMaterial,
+DEFINE_OBJECT_WRAPPER_WB(QQuickOpenGLShaderEffectMaterial, QSGMaterial)
     RW_PROP(attributes, setAttributes, MemberVar)
     RW_PROP(cullMode, setCullMode, MemberVar)
     RW_PROP(geometryUsesTextureSubRect, setGeometryUsesTextureSubRect, MemberVar)
     RW_PROP(textureProviders, setTextureProviders, MemberVar)
-)
+OBJECT_WRAPPER_END(QQuickOpenGLShaderEffectMaterial)
 #endif
 #endif
 

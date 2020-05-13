@@ -556,8 +556,6 @@ public: \
     using value_type = Class; \
     using ThisClass_t = ObjectWrapper<Class>; \
  \
-    __VA_ARGS__ \
- \
     static MetaObject *staticMetaObject() { \
         static auto mo = PropertyCache_t::createStaticMetaObject(QStringLiteral(#Class)); \
         return mo.get(); \
@@ -577,6 +575,7 @@ public: \
 private: \
     friend class ObjectWrapperTest; \
     friend class ObjectHandle<Class>; \
+public: \
 
 
 
@@ -591,7 +590,7 @@ private: \
  * PROP and CUSTOM_PROP macros in there, which define properties, the wrapper
  * will have. Also put DISABLE_CACHING here, if desired.
  */
-#define DECLARE_OBJECT_WRAPPER(Class, ...) \
+#define DEFINE_OBJECT_WRAPPER(Class) \
 namespace GammaRay { \
 DEFINE_FACTORY(Class) \
 template<> \
@@ -617,15 +616,11 @@ public: \
  \
     ObjectWrapperPrivate *d_ptr() const { return d.get(); } \
     std::shared_ptr<ObjectWrapperPrivate> cloneD() const { return d; } \
- \
-    OBJECT_WRAPPER_COMMON(Class, __VA_ARGS__) \
 protected: \
     std::shared_ptr<ObjectWrapperPrivate> d; \
-}; \
-} \
-Q_DECLARE_METATYPE(GammaRay::ObjectWrapper<Class>) \
-Q_DECLARE_METATYPE(GammaRay::ObjectHandle<Class>) \
-Q_DECLARE_METATYPE(GammaRay::ObjectView<Class>)
+ \
+    OBJECT_WRAPPER_COMMON(Class)
+
 
 /**
  * Defines a specialization of the dummy ObjectWrapper class template for
@@ -639,7 +634,7 @@ Q_DECLARE_METATYPE(GammaRay::ObjectView<Class>)
  * though, to put PROP and CUSTOM_PROP macros in there, which define properties,
  * the wrapper will have. Also put DISABLE_CACHING here, if desired.
  */
-#define DECLARE_OBJECT_WRAPPER_WB(Class, BaseClass, ...) \
+#define DEFINE_OBJECT_WRAPPER_WB(Class, BaseClass, ...) \
 namespace GammaRay { \
 DEFINE_FACTORY_WB(Class, BaseClass) \
 template<> \
@@ -665,13 +660,7 @@ public: \
     ObjectWrapperPrivate *d_ptr() const { return d.get(); } \
     std::shared_ptr<ObjectWrapperPrivate> cloneD() const { return d; } \
  \
-    OBJECT_WRAPPER_COMMON(Class, __VA_ARGS__) \
-private: \
-}; \
-} \
-Q_DECLARE_METATYPE(GammaRay::ObjectWrapper<Class>) \
-Q_DECLARE_METATYPE(GammaRay::ObjectHandle<Class>) \
-Q_DECLARE_METATYPE(GammaRay::ObjectView<Class>)
+    OBJECT_WRAPPER_COMMON(Class)
 
 /**
  * Defines a specialization of the dummy ObjectWrapper class template for
@@ -685,7 +674,7 @@ Q_DECLARE_METATYPE(GammaRay::ObjectView<Class>)
  * though, to put PROP and CUSTOM_PROP macros in there, which define properties,
  * the wrapper will have. Also put DISABLE_CACHING here, if desired.
  */
-#define DECLARE_OBJECT_WRAPPER_WB2(Class, BaseClass1, BaseClass2, ...) \
+#define DEFINE_OBJECT_WRAPPER_WB2(Class, BaseClass1, BaseClass2, ...) \
 namespace GammaRay { \
 DEFINE_FACTORY_WB2(Class, BaseClass1, BaseClass2) \
 template<> \
@@ -721,14 +710,14 @@ public: \
     ObjectWrapperPrivate *d_ptr() const { return ObjectWrapper<BaseClass1>::d.get(); } \
     std::shared_ptr<ObjectWrapperPrivate> cloneD() const { return ObjectWrapper<BaseClass1>::d; } \
     \
-    OBJECT_WRAPPER_COMMON(Class, __VA_ARGS__) \
-private: \
+    OBJECT_WRAPPER_COMMON(Class)
+
+#define OBJECT_WRAPPER_END(Class) \
 }; \
 } \
 Q_DECLARE_METATYPE(GammaRay::ObjectWrapper<Class>) \
 Q_DECLARE_METATYPE(GammaRay::ObjectHandle<Class>) \
 Q_DECLARE_METATYPE(GammaRay::ObjectView<Class>)
-
 
 
 namespace GammaRay {
@@ -786,7 +775,7 @@ auto downcast(Base_t b)
     return dynamic_cast<Derived_t>(b);
 }
 template<typename Derived_t, typename Base_t>
-auto downcast(Base_t b)
+auto downcast(Base_t)
     -> typename std::enable_if<!std::is_polymorphic<typename std::remove_pointer<Base_t>::type>::value, Derived_t>::type
 {
     return nullptr;
@@ -1499,7 +1488,7 @@ auto wrapPhase2(T &&value) -> typename std::enable_if<(flags & ForeignPointerBit
 }
 
 template<typename T, typename ...Args>
-auto unwrap(T && value, Args &&...dummy) -> decltype(std::forward<T>(value)) // Actually this is only supposed to support one argument, the variadic argument list is only to declare this as the fallback option.
+auto unwrap(T && value, Args &&...) -> decltype(std::forward<T>(value)) // Actually this is only supposed to support one argument, the variadic argument list is only to declare this as the fallback option.
 {
     return std::forward<T>(value);
 }

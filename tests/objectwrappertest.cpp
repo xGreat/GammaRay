@@ -328,56 +328,69 @@ public:
     int m_x = 42;
 };
 
-DECLARE_OBJECT_WRAPPER(SimpleNonQObjectTestObject,
-                       RO_PROP(x, Getter)
-                       RW_PROP(y, setY, MemberVar)
-)
-DECLARE_OBJECT_WRAPPER(NonConstGetterTestObject,
-                       RO_PROP(x, Getter | NonConst)
-                       CUSTOM_PROP(y, int, object->x() * 2.0, NonConst)
-)
-DECLARE_OBJECT_WRAPPER(QTimer, RO_PROP(isActive, Getter))
-DECLARE_OBJECT_WRAPPER(QObjectTestObject,
-                       PRIVATE_CLASS(QObjectTestObjectPrivate)
-                       RO_PROP(x, Getter | QProp)
-                       RW_PROP(y, setY, Getter | QProp)
-                       RO_PROP(str, Getter | NonConst)
-                       CUSTOM_PROP(halloDu, QString, object->echo("Hello, you."), CustomCommand)
-                       RO_PROP(t, MemberVar | OwningPointer)
-                       RO_PROP(children, Getter | OwningPointer)
-                       RO_PROP(nephew, Getter | ForeignPointer)
-                       RO_PROP(parent, Getter | NonOwningPointer)
-                       CUSTOM_PROP(childrenCount, int, getChildrenCount(object), CustomCommand)
-                       RO_PROP(hiddenVariable, DptrMember)
-                       RO_PROP(hiddenVarStr, DptrGetter | NonConst) // NonConst necessary for Qt < 5.9
-)
-DECLARE_OBJECT_WRAPPER(LinkedList,
-                       RO_PROP(i, Getter)
-                       RO_PROP(prev, Getter | NonOwningPointer)
-                       RW_PROP(next, setNext, Getter | OwningPointer)
-)
-DECLARE_OBJECT_WRAPPER(DisabledCachingTestObject,
-                       DISABLE_CACHING
-                       RO_PROP(x, Getter)
-)
-DECLARE_OBJECT_WRAPPER_WB(DerivedTestObject, SimpleNonQObjectTestObject,
-                       RW_PROP(z, setZ, Getter)
-)
-DECLARE_OBJECT_WRAPPER(TestMixin,
-                          RW_PROP(a, setA, Getter)
-)
-DECLARE_OBJECT_WRAPPER_WB2(MultiInheritanceTestObject, DerivedTestObject, TestMixin,
-                          RW_PROP(b, setB, Getter)
-)
+DEFINE_OBJECT_WRAPPER(SimpleNonQObjectTestObject)
+    RO_PROP(x, Getter)
+    RW_PROP(y, setY, MemberVar)
+OBJECT_WRAPPER_END(SimpleNonQObjectTestObject)
+
+DEFINE_OBJECT_WRAPPER(NonConstGetterTestObject)
+    RO_PROP(x, Getter | NonConst)
+    CUSTOM_PROP(y, int, object->x() * 2.0, NonConst)
+OBJECT_WRAPPER_END(NonConstGetterTestObject)
+
+DEFINE_OBJECT_WRAPPER(QTimer)
+    RO_PROP(isActive, Getter)
+OBJECT_WRAPPER_END(QTimer)
+
+DEFINE_OBJECT_WRAPPER(QObjectTestObject)
+    PRIVATE_CLASS(QObjectTestObjectPrivate)
+    RO_PROP(x, Getter | QProp)
+    RW_PROP(y, setY, Getter | QProp)
+    RO_PROP(str, Getter | NonConst)
+    CUSTOM_PROP(halloDu, QString, object->echo("Hello, you."), CustomCommand)
+    RO_PROP(t, MemberVar | OwningPointer)
+    RO_PROP(children, Getter | OwningPointer)
+    RO_PROP(nephew, Getter | ForeignPointer)
+    RO_PROP(parent, Getter | NonOwningPointer)
+    CUSTOM_PROP(childrenCount, int, getChildrenCount(object), CustomCommand)
+    RO_PROP(hiddenVariable, DptrMember)
+    RO_PROP(hiddenVarStr, DptrGetter | NonConst) // NonConst necessary for Qt < 5.9
+OBJECT_WRAPPER_END(QObjectTestObject)
+
+DEFINE_OBJECT_WRAPPER(LinkedList)
+    RO_PROP(i, Getter)
+    RO_PROP(prev, Getter | NonOwningPointer)
+    RW_PROP(next, setNext, Getter | OwningPointer)
+OBJECT_WRAPPER_END(LinkedList)
+
+DEFINE_OBJECT_WRAPPER(DisabledCachingTestObject)
+    DISABLE_CACHING
+    RO_PROP(x, Getter)
+OBJECT_WRAPPER_END(DisabledCachingTestObject)
+
+DEFINE_OBJECT_WRAPPER_WB(DerivedTestObject, SimpleNonQObjectTestObject)
+    RW_PROP(z, setZ, Getter)
+OBJECT_WRAPPER_END(DerivedTestObject)
+
+DEFINE_OBJECT_WRAPPER(TestMixin)
+    RW_PROP(a, setA, Getter)
+OBJECT_WRAPPER_END(TestMixin)
+
+DEFINE_OBJECT_WRAPPER_WB2(MultiInheritanceTestObject, DerivedTestObject, TestMixin)
+    RW_PROP(b, setB, Getter)
+OBJECT_WRAPPER_END(MultiInheritanceTestObject)
 
 
-DECLARE_OBJECT_WRAPPER(PolymorphicBaseTestObject,
-                       RO_PROP(x, Getter)
-                       RW_PROP(y, setY, MemberVar)
-)
-DECLARE_OBJECT_WRAPPER_WB(DerivedPolymorphicTestObject, PolymorphicBaseTestObject,
-                       RW_PROP(z, setZ, Getter)
-)
+
+DEFINE_OBJECT_WRAPPER(PolymorphicBaseTestObject)
+    RO_PROP(x, Getter)
+    RW_PROP(y, setY, MemberVar)
+OBJECT_WRAPPER_END(PolymorphicBaseTestObject)
+
+DEFINE_OBJECT_WRAPPER_WB(DerivedPolymorphicTestObject, PolymorphicBaseTestObject)
+    RW_PROP(z, setZ, Getter)
+OBJECT_WRAPPER_END(DerivedPolymorphicTestObject)
+
 
 
 namespace GammaRay {
@@ -391,12 +404,14 @@ CustomPolymorphyDerivedClass *downcast<CustomPolymorphyDerivedClass *, CustomPol
 }
 
 }
-DECLARE_OBJECT_WRAPPER(CustomPolymorphyBaseClass,
-                       RO_PROP(x, MemberVar)
-)
-DECLARE_OBJECT_WRAPPER_WB(CustomPolymorphyDerivedClass, CustomPolymorphyBaseClass,
-                       RO_PROP(y, MemberVar)
-)
+DEFINE_OBJECT_WRAPPER(CustomPolymorphyBaseClass)
+    RO_PROP(x, MemberVar)
+OBJECT_WRAPPER_END(CustomPolymorphyBaseClass)
+
+DEFINE_OBJECT_WRAPPER_WB(CustomPolymorphyDerivedClass, CustomPolymorphyBaseClass)
+    RO_PROP(y, MemberVar)
+OBJECT_WRAPPER_END(CustomPolymorphyDerivedClass)
+
 
 namespace GammaRay {
 
