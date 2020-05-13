@@ -894,7 +894,7 @@ struct PropertyCache final : PropertyCacheBase
     }
 
     template<size_t I>
-    decltype(std::get<I>(dataStorage)) get()
+    typename std::tuple_element<I, decltype(dataStorage)>::type &get()
     {
         return std::get<I>(dataStorage);
     }
