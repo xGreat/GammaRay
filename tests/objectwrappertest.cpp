@@ -353,8 +353,8 @@ DEFINE_OBJECT_WRAPPER(QObjectTestObject)
     RO_PROP(nephew, Getter | ForeignPointer)
     RO_PROP(parent, Getter | NonOwningPointer)
     CUSTOM_PROP(childrenCount, int, getChildrenCount(object), CustomCommand)
-    RO_PROP(hiddenVariable, DptrMember)
-    RO_PROP(hiddenVarStr, DptrGetter | NonConst) // NonConst necessary for Qt < 5.9
+    RO_PROP(hiddenVariable, DptrMember | NonConst) // NonConst necessary for Qt < 5.9
+    RO_PROP(hiddenVarStr, DptrGetter | NonConst)
 OBJECT_WRAPPER_END(QObjectTestObject)
 
 DEFINE_OBJECT_WRAPPER(LinkedList)
@@ -541,7 +541,7 @@ private slots:
             QCOMPARE(ObjectShadowDataRepository::instance()->m_objectToWrapperPrivateMap.size(), 2);
 
             QVERIFY(l.object());
-            QVERIFY(l->d);
+            QVERIFY((bool)l->d);
             QVERIFY(ll.next()->prev());
             QVERIFY(l->next()->d != l->d);
             QVERIFY(l->next().object());
@@ -856,7 +856,7 @@ private slots:
 
         static_assert(std::is_same<decltype(w->nephew()), ObjectView<QObjectTestObject>>::value, "datatype of ForeignPointer property is incorrect.");
 
-        QVERIFY(v->nephew());
+        QVERIFY((bool)v->nephew());
         QCOMPARE(v->nephew()->x(), 5);
         QCOMPARE(v->nephew()->y(), 6);
     }

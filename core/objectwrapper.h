@@ -634,7 +634,7 @@ protected: \
  * though, to put PROP and CUSTOM_PROP macros in there, which define properties,
  * the wrapper will have. Also put DISABLE_CACHING here, if desired.
  */
-#define DEFINE_OBJECT_WRAPPER_WB(Class, BaseClass, ...) \
+#define DEFINE_OBJECT_WRAPPER_WB(Class, BaseClass) \
 namespace GammaRay { \
 DEFINE_FACTORY_WB(Class, BaseClass) \
 template<> \
@@ -674,7 +674,7 @@ public: \
  * though, to put PROP and CUSTOM_PROP macros in there, which define properties,
  * the wrapper will have. Also put DISABLE_CACHING here, if desired.
  */
-#define DEFINE_OBJECT_WRAPPER_WB2(Class, BaseClass1, BaseClass2, ...) \
+#define DEFINE_OBJECT_WRAPPER_WB2(Class, BaseClass1, BaseClass2) \
 namespace GammaRay { \
 DEFINE_FACTORY_WB2(Class, BaseClass1, BaseClass2) \
 template<> \
@@ -797,6 +797,7 @@ struct PropertyCacheBase
 };
 
 class ObjectWrapperPrivate;
+
 
 template<typename Class, typename PrimaryBaseClass, typename ...SecondaryBaseClasses>
 std::tuple<
