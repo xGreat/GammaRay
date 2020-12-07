@@ -58,12 +58,16 @@ void StreamOperators::registerOperators()
     StreamOperators::registerOperators<QHash<int, QByteArray> >();
 
     StreamOperators::registerOperators<ObjectId>();
+#ifndef GAMMARAY_QT6_TODO
     // This is needed so QVariant based comparison works (ie: QAIM::match)
     QMetaType::registerComparators<ObjectId>();
+#endif
 
     StreamOperators::registerOperators<ObjectIds>();
+#ifndef GAMMARAY_QT6_TODO
     // This is needed so QVariant based comparison works (ie: QAIM::match)
     QMetaType::registerComparators<ObjectIds>();
+#endif
 
     StreamOperators::registerOperators<GammaRay::VariantWrapper>();
     StreamOperators::registerOperators<GammaRay::SourceLocation>();

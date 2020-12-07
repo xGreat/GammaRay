@@ -16,7 +16,7 @@ target_link_libraries(gammaray_qmlsupport gammaray_core Qt::Qml Qt::QmlPrivate)
 endif()
 
 
-if(NOT Qt5Qml_VERSION VERSION_LESS 5.10)
+if(NOT Qt5Qml_VERSION VERSION_LESS 5.10 OR TARGET Qt6::Qml)
     target_sources(gammaray_qmlsupport PUBLIC qmlbindingprovider.cpp)
 endif()
 

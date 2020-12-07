@@ -40,8 +40,10 @@
 
 #include <QGuiApplication>
 #include <QOpenGLContext>
+#ifndef GAMMARAY_QT6_TODO
 #include <QOpenGLShader>
 #include <QOpenGLShaderProgram>
+#endif
 #include <QScreen>
 #include <QWindow>
 
@@ -90,10 +92,12 @@ Q_DECLARE_METATYPE(QFlags<Qt::MouseEventFlag>)
 Q_DECLARE_METATYPE(QTouchEvent::TouchPoint)
 Q_DECLARE_METATYPE(QList<QTouchEvent::TouchPoint>)
 Q_DECLARE_METATYPE(Qt::TouchPointState)
+#ifndef GAMMARAY_QT6_TODO
 Q_DECLARE_METATYPE(QFlags<QTouchEvent::TouchPoint::InfoFlag>)
 Q_DECLARE_METATYPE(QFlags<QTouchDevice::CapabilityFlag>)
 Q_DECLARE_METATYPE(QTouchDevice*)
 Q_DECLARE_METATYPE(const QTouchDevice*)
+#endif
 Q_DECLARE_METATYPE(QScrollEvent::ScrollState)
 Q_DECLARE_METATYPE(QList<QInputMethodEvent::Attribute>)
 Q_DECLARE_METATYPE(QContextMenuEvent::Reason)
@@ -310,6 +314,7 @@ void GuiSupport::registerMetaTypes()
     MO_ADD_PROPERTY_RO(QWindow, type);
 
 #ifndef QT_NO_OPENGL
+#ifndef GAMMARAY_QT6_TODO
     MO_ADD_METAOBJECT1(QOpenGLShader, QObject);
     MO_ADD_PROPERTY_RO(QOpenGLShader, isCompiled);
     MO_ADD_PROPERTY_RO(QOpenGLShader, log);
@@ -324,6 +329,7 @@ void GuiSupport::registerMetaTypes()
 // MO_ADD_PROPERTY_RO(QOpenGLShaderProgram, maxGeometryOutputVertices);
     MO_ADD_PROPERTY(QOpenGLShaderProgram, patchVertexCount, setPatchVertexCount);
     MO_ADD_PROPERTY_RO(QOpenGLShaderProgram, programId);
+#endif
 
     MO_ADD_METAOBJECT1(QOpenGLContext, QObject);
     MO_ADD_PROPERTY_RO(QOpenGLContext, defaultFramebufferObject);
@@ -503,8 +509,10 @@ void GuiSupport::registerMetaTypes()
     MO_ADD_PROPERTY_RO(QWheelEvent, source);
 
     MO_ADD_METAOBJECT1(QTabletEvent, QInputEvent);
+#ifndef GAMMARAY_QT6_TODO
     MO_ADD_PROPERTY_RO(QTabletEvent, posF);
     MO_ADD_PROPERTY_RO(QTabletEvent, globalPosF);
+#endif
     MO_ADD_PROPERTY_RO(QTabletEvent, device);
     MO_ADD_PROPERTY_RO(QTabletEvent, pointerType);
     MO_ADD_PROPERTY_RO(QTabletEvent, uniqueId);
@@ -579,8 +587,11 @@ void GuiSupport::registerMetaTypes()
     MO_ADD_PROPERTY_RO(QTouchEvent, device);
     MO_ADD_PROPERTY_RO(QTouchEvent, target);
     MO_ADD_PROPERTY_RO(QTouchEvent, touchPoints);
+#ifndef GAMMARAY_QT6_TODO
     MO_ADD_PROPERTY_RO(QTouchEvent, window);
+#endif
 
+#ifndef GAMMARAY_QT6_TODO
     MO_ADD_METAOBJECT0(QTouchEvent::TouchPoint);
     MO_ADD_PROPERTY_RO(QTouchEvent::TouchPoint, id);
     MO_ADD_PROPERTY_RO(QTouchEvent::TouchPoint, state);
@@ -603,11 +614,14 @@ void GuiSupport::registerMetaTypes()
     MO_ADD_PROPERTY_RO(QTouchEvent::TouchPoint, ellipseDiameters);
 #endif
 
+#ifndef GAMMARAY_QT6_TODO
     MO_ADD_METAOBJECT0(QTouchDevice);
     MO_ADD_PROPERTY_RO(QTouchDevice, capabilities);
     MO_ADD_PROPERTY_RO(QTouchDevice, maximumTouchPoints);
     MO_ADD_PROPERTY_RO(QTouchDevice, name);
     MO_ADD_PROPERTY_RO(QTouchDevice, type);
+#endif
+#endif
 
     MO_ADD_METAOBJECT1(QScrollPrepareEvent, QEvent);
     MO_ADD_PROPERTY_RO(QScrollPrepareEvent, startPos);
@@ -703,6 +717,7 @@ static const MetaEnum::Value<QSurface::SurfaceType> surface_type_table[] = {
 #undef E
 
 #ifndef QT_NO_OPENGL
+#ifndef GAMMARAY_QT6_TODO
 static QString shaderTypeToString(const QOpenGLShader::ShaderType type)
 {
     QStringList types;
@@ -719,6 +734,7 @@ static QString shaderTypeToString(const QOpenGLShader::ShaderType type)
         return QStringLiteral("<none>");
     return types.join(QStringLiteral(" | "));
 }
+#endif
 #endif // QT_NO_OPENGL
 
 static QString textLengthToString(const QTextLength &l)
@@ -859,9 +875,11 @@ static const MetaEnum::Value<QPainter::RenderHint> painter_render_hint_table[] =
     E(Antialiasing),
     E(TextAntialiasing),
     E(SmoothPixmapTransform),
+#ifndef GAMMARAY_QT6_TODO
     E(HighQualityAntialiasing),
     E(NonCosmeticDefaultPen),
     E(Qt4CompatiblePainting)
+#endif
 };
 #undef E
 
@@ -975,6 +993,7 @@ static const MetaEnum::Value<QPixelFormat::YUVLayout> pixelformat_yuvlayout_tabl
 };
 #undef E
 
+#ifndef GAMMARAY_QT6_TODO
 #define E(x) { QTouchEvent::TouchPoint:: x, #x }
 static const MetaEnum::Value<QTouchEvent::TouchPoint::InfoFlags> touch_point_info_flag_table[] = {
     E(Pen),
@@ -995,6 +1014,7 @@ static const MetaEnum::Value<QTouchDevice::Capabilities> touch_device_capabiliti
     E(MouseEmulation)
 };
 #undef E
+#endif
 
 static QString brushToString(const QBrush &b)
 {
@@ -1030,6 +1050,7 @@ static QString regionToString(const QRegion &region)
         return QStringLiteral("<null>");
     if (region.isEmpty())
         return QStringLiteral("<empty>");
+#ifndef GAMMARAY_QT6_TODO
     if (region.rectCount() == 1)
         return VariantHandler::displayString(region.rects().at(0));
 
@@ -1042,6 +1063,9 @@ static QString regionToString(const QRegion &region)
         VariantHandler::displayString(region.boundingRect()),
         rects.join(QLatin1String("; "))
     );
+#else
+    return "TODO";
+#endif
 }
 
 static QString imageToString(const QImage &image)
@@ -1065,7 +1089,9 @@ void GuiSupport::registerVariantHandler()
     ER_REGISTER_ENUM(QSurface, SurfaceType, surface_type_table);
     ER_REGISTER_FLAGS(QSurfaceFormat, FormatOptions, surface_format_option_table);
 #ifndef QT_NO_OPENGL
+#ifndef GAMMARAY_QT6_TODO
     VariantHandler::registerStringConverter<QOpenGLShader::ShaderType>(shaderTypeToString);
+#endif
 #endif
 
     ER_REGISTER_ENUM(QFont, Capitalization, font_capitalization_table);
@@ -1104,8 +1130,10 @@ void GuiSupport::registerVariantHandler()
     ER_REGISTER_ENUM(QPixelFormat, TypeInterpretation, pixelformat_typeinterpretation_table);
     ER_REGISTER_ENUM(QPixelFormat, YUVLayout, pixelformat_yuvlayout_table);
 
+#ifndef GAMMARAY_QT6_TODO
     ER_REGISTER_FLAGS(QTouchEvent::TouchPoint, InfoFlags, touch_point_info_flag_table);
     ER_REGISTER_FLAGS(QTouchDevice, Capabilities, touch_device_capabilitites_flag_table);
+#endif
 }
 
 QObject *GuiSupport::targetObject(QObject *object) const

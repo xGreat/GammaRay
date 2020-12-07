@@ -909,6 +909,7 @@ QTouchEvent::TouchPoint RemoteViewWidget::mapToSource(const QTouchEvent::TouchPo
 {
     QTouchEvent::TouchPoint p;
 
+#ifndef GAMMARAY_QT6_TODO
     p.setFlags(point.flags());
     p.setId(point.id());
     p.setPressure(point.pressure());
@@ -934,6 +935,7 @@ QTouchEvent::TouchPoint RemoteViewWidget::mapToSource(const QTouchEvent::TouchPo
     p.setLastScreenPos(mapToSource(point.lastScreenPos()));
     p.setScreenPos(mapToSource(point.screenPos()));
     p.setScreenRect(mapToSource(point.screenRect()));
+#endif
 
     return p;
 }
@@ -1386,6 +1388,7 @@ void RemoteViewWidget::sendTouchEvent(QTouchEvent *event)
 {
     event->accept();
 
+#ifndef GAMMARAY_QT6_TODO
     QList<QTouchEvent::TouchPoint> touchPoints;
     foreach (const QTouchEvent::TouchPoint &point, event->touchPoints()) {
         touchPoints << mapToSource(point);
@@ -1400,4 +1403,5 @@ void RemoteViewWidget::sendTouchEvent(QTouchEvent *event)
                                 caps,
                                 event->device()->maximumTouchPoints(),
                                 event->modifiers(), event->touchPointStates(), touchPoints);
+#endif
 }

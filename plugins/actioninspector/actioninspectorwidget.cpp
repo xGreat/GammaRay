@@ -61,7 +61,9 @@ ActionInspectorWidget::ActionInspectorWidget(QWidget *parent)
     ui->actionView->setDeferredResizeMode(3, QHeaderView::ResizeToContents);
     ui->actionView->setDeferredResizeMode(4, QHeaderView::ResizeToContents);
     ui->actionView->setModel(actionModel);
+#ifndef GAMMARAY_QT6_TODO
     ui->actionView->sortByColumn(ActionModel::ShortcutsPropColumn);
+#endif
     connect(ui->actionView, &QWidget::customContextMenuRequested, this, &ActionInspectorWidget::contextMenu);
 
     auto selectionModel = ObjectBroker::selectionModel(actionModel);

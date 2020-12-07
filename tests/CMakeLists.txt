@@ -5,23 +5,33 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/${LIB_INSTALL_DIR})
 configure_file(gammaray-test-config.h.in ${CMAKE_CURRENT_BINARY_DIR}/gammaray-test-config.h)
 
 # create intermediate modeltestobj object files which unit tests can use
+if (TARGET Qt5::Core)
 add_library(modeltestobj OBJECT ${CMAKE_SOURCE_DIR}/3rdparty/qt/modeltest.cpp)
 set_target_properties(modeltestobj PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_compile_features(modeltestobj PUBLIC ${GAMMARAY_REQUIRED_CXX_FEATURES})
 target_compile_definitions(modeltestobj PRIVATE $<TARGET_PROPERTY:Qt5::Core,INTERFACE_COMPILE_DEFINITIONS>) # for -DQT_NAMESPACE=...
 target_include_directories(modeltestobj PUBLIC $<TARGET_PROPERTY:Qt5::Core,INTERFACE_INCLUDE_DIRECTORIES>)
+else()
+add_library(modeltestobj OBJECT)
+endif ()
+
+if (TARGET Qt6::Core)
+    set(QT_TARGET_NAMESPACE Qt6)
+else()
+    set(QT_TARGET_NAMESPACE Qt5)
+endif()
 
 # create intermediate test_helpers_obj object files which unit tests can use
 add_library(test_helpers_obj OBJECT testhelpers.cpp)
 set_target_properties(test_helpers_obj PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_compile_features(test_helpers_obj PUBLIC ${GAMMARAY_REQUIRED_CXX_FEATURES})
 target_compile_definitions(test_helpers_obj PRIVATE
-    $<TARGET_PROPERTY:Qt5::Core,INTERFACE_COMPILE_DEFINITIONS>
-    $<TARGET_PROPERTY:Qt5::Test,INTERFACE_COMPILE_DEFINITIONS>
+    $<TARGET_PROPERTY:${QT_TARGET_NAMESPACE}::Core,INTERFACE_COMPILE_DEFINITIONS>
+    $<TARGET_PROPERTY:${QT_TARGET_NAMESPACE}::Test,INTERFACE_COMPILE_DEFINITIONS>
 ) # for -DQT_NAMESPACE=...
 target_include_directories(test_helpers_obj PUBLIC
-  $<TARGET_PROPERTY:Qt5::Core,INTERFACE_INCLUDE_DIRECTORIES>
-  $<TARGET_PROPERTY:Qt5::Test,INTERFACE_INCLUDE_DIRECTORIES>
+  $<TARGET_PROPERTY:${QT_TARGET_NAMESPACE}::Core,INTERFACE_INCLUDE_DIRECTORIES>
+  $<TARGET_PROPERTY:${QT_TARGET_NAMESPACE}::Test,INTERFACE_INCLUDE_DIRECTORIES>
 )
 
 if(NOT GAMMARAY_CLIENT_ONLY_BUILD)
@@ -34,12 +44,12 @@ target_include_directories(base_probe_test_obj PUBLIC
   $<TARGET_PROPERTY:gammaray_common,INTERFACE_INCLUDE_DIRECTORIES>
 )
 target_compile_definitions(base_probe_test_obj PRIVATE
-    $<TARGET_PROPERTY:Qt5::Core,INTERFACE_COMPILE_DEFINITIONS>
-    $<TARGET_PROPERTY:Qt5::Test,INTERFACE_COMPILE_DEFINITIONS>
+    $<TARGET_PROPERTY:${QT_TARGET_NAMESPACE}::Core,INTERFACE_COMPILE_DEFINITIONS>
+    $<TARGET_PROPERTY:${QT_TARGET_NAMESPACE}::Test,INTERFACE_COMPILE_DEFINITIONS>
 ) # for -DQT_NAMESPACE=...
 target_include_directories(base_probe_test_obj PUBLIC
-  $<TARGET_PROPERTY:Qt5::Core,INTERFACE_INCLUDE_DIRECTORIES>
-  $<TARGET_PROPERTY:Qt5::Test,INTERFACE_INCLUDE_DIRECTORIES>
+  $<TARGET_PROPERTY:${QT_TARGET_NAMESPACE}::Core,INTERFACE_INCLUDE_DIRECTORIES>
+  $<TARGET_PROPERTY:${QT_TARGET_NAMESPACE}::Test,INTERFACE_INCLUDE_DIRECTORIES>
 )
 
 if(TARGET Qt::Quick)
@@ -48,15 +58,15 @@ if(TARGET Qt::Quick)
   set_target_properties(base_quick_test_obj PROPERTIES POSITION_INDEPENDENT_CODE ON)
   target_compile_features(base_quick_test_obj PUBLIC ${GAMMARAY_REQUIRED_CXX_FEATURES})
   target_compile_definitions(base_quick_test_obj PRIVATE
-    $<TARGET_PROPERTY:Qt5::Core,INTERFACE_COMPILE_DEFINITIONS>
-    $<TARGET_PROPERTY:Qt5::Test,INTERFACE_COMPILE_DEFINITIONS>
-    $<TARGET_PROPERTY:Qt5::Quick,INTERFACE_COMPILE_DEFINITIONS>
+    $<TARGET_PROPERTY:${QT_TARGET_NAMESPACE}::Core,INTERFACE_COMPILE_DEFINITIONS>
+    $<TARGET_PROPERTY:${QT_TARGET_NAMESPACE}::Test,INTERFACE_COMPILE_DEFINITIONS>
+    $<TARGET_PROPERTY:${QT_TARGET_NAMESPACE}::Quick,INTERFACE_COMPILE_DEFINITIONS>
   ) # for -DQT_NAMESPACE=...
   target_include_directories(base_quick_test_obj PUBLIC
     $<TARGET_PROPERTY:base_probe_test_obj,INTERFACE_INCLUDE_DIRECTORIES>
   )
   target_include_directories(base_quick_test_obj PUBLIC
-    $<TARGET_PROPERTY:Qt5::Quick,INTERFACE_INCLUDE_DIRECTORIES>
+    $<TARGET_PROPERTY:${QT_TARGET_NAMESPACE}::Quick,INTERFACE_INCLUDE_DIRECTORIES>
   )
 endif()
 endif()
@@ -341,12 +351,14 @@ gammaray_add_test(fontdatabasemodeltest
 )
 target_link_libraries(fontdatabasemodeltest Qt::Gui)
 
-gammaray_add_test(codecmodeltest
-  codecmodeltest.cpp
-  ${CMAKE_SOURCE_DIR}/plugins/codecbrowser/codecmodel.cpp
-  $<TARGET_OBJECTS:modeltestobj>
-)
-target_link_libraries(codecmodeltest Qt::Gui)
+if (TARGET Qt5::Core)
+    gammaray_add_test(codecmodeltest
+    codecmodeltest.cpp
+    ${CMAKE_SOURCE_DIR}/plugins/codecbrowser/codecmodel.cpp
+    $<TARGET_OBJECTS:modeltestobj>
+    )
+    target_link_libraries(codecmodeltest Qt::Gui)
+endif()
 
 if(NOT GAMMARAY_CLIENT_ONLY_BUILD)
   #does not work unless the translations are installed in QT_INSTALL_TRANSLATIONS
@@ -399,7 +411,7 @@ if(NOT GAMMARAY_CLIENT_ONLY_BUILD)
     target_link_libraries(qmlsupporttest gammaray_core Qt::Quick Qt::QmlPrivate)
   endif()
 
-  if(Qt5Quick_FOUND AND NOT Qt5Quick_VERSION VERSION_LESS 5.7) # requires MSVC 2013 or higher
+  if(TARGET Qt::Quick AND NOT Qt5Quick_VERSION VERSION_LESS 5.7) # requires MSVC 2013 or higher
     gammaray_add_quick_test(bindinginspectortest
       bindinginspectortest.cpp
       $<TARGET_OBJECTS:modeltestobj>

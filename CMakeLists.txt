@@ -215,7 +215,7 @@ gammaray_option(GAMMARAY_MULTI_BUILD "Build multiple applicable probe configurat
 gammaray_option(GAMMARAY_BUILD_CLI_INJECTOR "Build command line injector on Windows." ON)
 
 set(GAMMARAY_BUILD_DOCS_DEFAULT ON)
-set(GAMMARAY_DISABLE_FEEDBACK_DEFAULT OFF)
+set(GAMMARAY_DISABLE_FEEDBACK_DEFAULT ON) # TODO Qt 6
 if(GAMMARAY_PROBE_ONLY_BUILD OR CMAKE_CROSSCOMPILING)
   set(GAMMARAY_BUILD_DOCS_DEFAULT OFF)
   set(GAMMARAY_DISABLE_FEEDBACK_DEFAULT ON)
@@ -269,6 +269,7 @@ endmacro()
 
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 set(CMAKE_VISIBILITY_INLINES_HIDDEN ON)
+set(CMAKE_CXX_STANDARD 17)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_flag_if_supported(-Wunused-but-set-variable UNUSED_BUT_SET)
@@ -344,11 +345,22 @@ endif()
 #
 # Finding Qt
 #
-find_package(Qt5Core 5.5 NO_MODULE REQUIRED)
+find_package(Qt6Core 6.0 NO_MODULE)
+if (TARGET Qt6::Core)
+    message("Qt6 found!")
+    set(_qt_main_package Qt6)
+    find_package(Qt6Core 6.0 NO_MODULE REQUIRED)
+    set_package_properties(Qt6Core PROPERTIES TYPE REQUIRED)
+    add_definitions(-DGAMMARAY_QT6_TODO)
+else()
+    message("Qt5 found!")
+    set(_qt_main_package Qt5)
+    find_package(Qt5Core 5.5 NO_MODULE REQUIRED)
+    set_package_properties(Qt5Core PROPERTIES TYPE REQUIRED)
+endif()
 
-set_package_properties(Qt5Core PROPERTIES TYPE REQUIRED)
-find_package(Qt5 NO_MODULE REQUIRED COMPONENTS Gui Network)
-find_package(Qt5 NO_MODULE QUIET OPTIONAL_COMPONENTS
+find_package(${_qt_main_package} NO_MODULE REQUIRED COMPONENTS Gui Network)
+find_package(${_qt_main_package} NO_MODULE QUIET OPTIONAL_COMPONENTS
   3DAnimation
   3DExtras
   3DInput
@@ -412,11 +424,11 @@ endif()
 
 # if translation/doc host tools are missing, the Qt5 cmake config files throw errors...
 if(GAMMARAY_BUILD_DOCS)
-  find_package(Qt5 NO_MODULE QUIET OPTIONAL_COMPONENTS Help LinguistTools)
+  #find_package(Qt5 NO_MODULE QUIET OPTIONAL_COMPONENTS Help LinguistTools)
 endif()
 
 if(GAMMARAY_BUILD_UI) # widgets are required for the UI
-  find_package(Qt5 NO_MODULE REQUIRED COMPONENTS Widgets)
+  #find_package(Qt5 NO_MODULE REQUIRED COMPONENTS Widgets)
   # 3D Widget inspector requires Qt3D 5.7
   if(Qt5Core_VERSION VERSION_EQUAL 5.7 OR Qt5Core_VERSION VERSION_GREATER 5.7)
     if(${Qt53DRender_FOUND} AND ${Qt53DInput_FOUND} AND ${Qt53DLogic_FOUND} AND ${Qt53DQuick_FOUND})
@@ -435,7 +447,7 @@ set(HAVE_QT_DESIGNER ${QtDesigner_FOUND})
 
 if(TARGET Qt::Gui)
   cmake_push_check_state()
-  set(CMAKE_REQUIRED_LIBRARIES Qt5::Gui)
+  set(CMAKE_REQUIRED_LIBRARIES Qt::Gui)
   check_cxx_symbol_exists(QT_NO_OPENGL "QOpenGLContext" QT_NO_OPENGL)
   cmake_pop_check_state()
 endif()
@@ -520,7 +532,7 @@ set_package_properties(Glslang PROPERTIES URL "https://github.com/KhronosGroup/g
 find_package(QmlLint)
 set_package_properties(QmlLint PROPERTIES URL "https://qt.io" PURPOSE "Validate QML code.")
 
-find_package(KF5SyntaxHighlighting 5.28 NO_MODULE QUIET)
+#find_package(KF5SyntaxHighlighting 5.28 NO_MODULE QUIET)
 set_package_properties(KF5SyntaxHighlighting PROPERTIES TYPE RECOMMENDED URL "https://www.kde.org/" PURPOSE "Syntax highlighting for code editor.")
 if(TARGET KF5::SyntaxHighlighting)
   set(HAVE_SYNTAX_HIGHLIGHTING TRUE)
@@ -670,7 +682,7 @@ include_directories(
   ${CMAKE_BINARY_DIR}
 )
 
-include(QtInstallPaths) #to set QT_INSTALL_FOO variables
+#include(QtInstallPaths) #to set QT_INSTALL_FOO variables
 add_subdirectory(cmake)
 add_subdirectory(3rdparty/kde)
 add_subdirectory(common)
@@ -825,8 +837,8 @@ elseif(UNIX)
 endif()
 
 include(CPack)
-include(PackageIFW)
+#include(PackageIFW)
 
-addPackageTarget(GammaRay gammaray_probe install lib)
+#addPackageTarget(GammaRay gammaray_probe install lib)
 
 feature_summary(WHAT ALL INCLUDE_QUIET_PACKAGES FATAL_ON_MISSING_REQUIRED_PACKAGES)

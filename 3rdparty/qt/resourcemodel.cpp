@@ -1318,7 +1318,11 @@ QString ResourceModelPrivate::type(const QModelIndex &index) const
 QString ResourceModelPrivate::time(const QModelIndex &index) const
 {
 #ifndef QT_NO_DATESTRING
+#ifndef GAMMARAY_QT6_TODO
     return node(index)->info.lastModified().toString(Qt::LocalDate);
+#else
+    return {};
+#endif
 #else
     Q_UNUSED(index);
     return QString();

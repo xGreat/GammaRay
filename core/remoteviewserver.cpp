@@ -183,6 +183,7 @@ void RemoteViewServer::sendWheelEvent(const QPoint &localPos, QPoint pixelDelta,
 void RemoteViewServer::sendTouchEvent(int type, int touchDeviceType, int deviceCaps, int touchDeviceMaxTouchPoints,
                                       int modifiers, Qt::TouchPointStates touchPointStates, const QList<QTouchEvent::TouchPoint> &touchPoints)
 {
+#ifndef GAMMARAY_QT6_TODO
     if (!m_eventReceiver)
         return;
 
@@ -197,8 +198,8 @@ void RemoteViewServer::sendTouchEvent(int type, int touchDeviceType, int deviceC
 
     auto event = new QTouchEvent(QEvent::Type(type), m_touchDevice.get(), Qt::KeyboardModifiers(modifiers), touchPointStates, touchPoints);
     event->setWindow(m_eventReceiver);
-
     QCoreApplication::sendEvent(m_eventReceiver, event);
+#endif
 }
 
 void RemoteViewServer::setViewActive(bool active)

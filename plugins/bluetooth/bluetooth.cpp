@@ -43,12 +43,15 @@
 
 Q_DECLARE_METATYPE(QBluetooth::SecurityFlags)
 Q_DECLARE_METATYPE(QBluetoothDeviceDiscoveryAgent::Error)
+#ifndef GAMMARAY_QT6_TODO
 Q_DECLARE_METATYPE(QBluetoothDeviceDiscoveryAgent::InquiryType)
+#endif
 Q_DECLARE_METATYPE(QBluetoothServer::Error)
 Q_DECLARE_METATYPE(QBluetoothServiceInfo::Protocol)
 
 using namespace GammaRay;
 
+#ifndef GAMMARAY_QT6_TODO
 static QString bluetoothInquiryTypeToString(QBluetoothDeviceDiscoveryAgent::InquiryType type)
 {
     switch (type) {
@@ -60,12 +63,15 @@ static QString bluetoothInquiryTypeToString(QBluetoothDeviceDiscoveryAgent::Inqu
     Q_UNREACHABLE();
     return QString();
 }
+#endif
 
 Bluetooth::Bluetooth(Probe *probe, QObject *parent)
     : QObject(parent)
 {
     Q_UNUSED(probe);
+#ifndef GAMMARAY_QT6_TODO
     qRegisterMetaType<QBluetoothDeviceDiscoveryAgent::InquiryType>();
+#endif
 
     MetaObject *mo = nullptr;
     MO_ADD_METAOBJECT1(QBluetoothDeviceDiscoveryAgent, QObject);
@@ -110,6 +116,8 @@ Bluetooth::Bluetooth(Probe *probe, QObject *parent)
     MO_ADD_PROPERTY_RO(QBluetoothSocket, state);
 
     VariantHandler::registerStringConverter<QBluetoothAddress>(std::mem_fn(&QBluetoothAddress::toString));
+#ifndef GAMMARAY_QT6_TODO
     VariantHandler::registerStringConverter<QBluetoothDeviceDiscoveryAgent::InquiryType>(
         bluetoothInquiryTypeToString);
+#endif
 }

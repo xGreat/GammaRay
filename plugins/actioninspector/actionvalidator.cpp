@@ -59,7 +59,11 @@ QList<QAction *> ActionValidator::actions() const
 
 QList<QAction *> ActionValidator::actions(const QKeySequence &sequence) const
 {
+#ifndef GAMMARAY_QT6_TODO
     return m_shortcutActionMap.values(sequence);
+#else
+    return {};
+#endif
 }
 
 void ActionValidator::setActions(const QList<QAction *> &actions)
@@ -81,12 +85,14 @@ void ActionValidator::insert(QAction *action)
 {
     Q_ASSERT(action);
 
+#ifndef GAMMARAY_QT6_TODO
     Q_FOREACH(const QKeySequence &sequence, action->shortcuts()) {
         if (m_shortcutActionMap.values(sequence).contains(action))
             continue;
 
         m_shortcutActionMap.insertMulti(sequence, action);
     }
+#endif
 
     // also track object destruction
     connect(action, &QObject::destroyed,
@@ -104,6 +110,7 @@ void ActionValidator::remove(QAction *action)
 
 void ActionValidator::safeRemove(QAction *action)
 {
+#ifndef GAMMARAY_QT6_TODO
     Q_FOREACH(const QKeySequence &sequence, m_shortcutActionMap.keys()) {
         if (!m_shortcutActionMap.values(sequence).contains(action))
             continue;
@@ -114,6 +121,7 @@ void ActionValidator::safeRemove(QAction *action)
         Q_ASSERT(success);
         m_shortcutActionMap[sequence] = action;
     }
+#endif
 }
 
 void ActionValidator::handleActionDestroyed(QObject *object)
@@ -154,6 +162,7 @@ bool GammaRay::ActionValidator::isAmbigous(const QAction *action, const QKeySequ
         return false;
     }
 
+#ifndef GAMMARAY_QT6_TODO
     Q_FOREACH(const QAction *other, m_shortcutActionMap.values(sequence)) {
         if (!other || other == action || !Probe::instance()->isValidObject(other)) {
             continue;
@@ -198,5 +207,6 @@ bool GammaRay::ActionValidator::isAmbigous(const QAction *action, const QKeySequ
             }
         }
     }
+#endif
     return false;
 }

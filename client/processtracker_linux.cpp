@@ -33,7 +33,9 @@
 
 #include <QFile>
 #include <QStringList>
+#ifndef GAMMARAY_QT6_TODO
 #include <QTextCodec>
+#endif
 
 namespace {
 static QString readFile(const QString &filePath, const QByteArray &codec = QByteArrayLiteral("UTF-8"))
@@ -50,12 +52,16 @@ static QString readFile(const QString &filePath, const QByteArray &codec = QByte
         return QString();
     }
 
+#ifndef GAMMARAY_QT6_TODO
     QTextCodec *tc = QTextCodec::codecForName(codec);
     if (!tc) {
         tc = QTextCodec::codecForLocale();
     }
 
     return tc->toUnicode(file.readAll());
+#else
+    return QString::fromUtf8(file.readAll());
+#endif
 }
 }
 

@@ -187,6 +187,7 @@ QString UIResources::themedFilePath(UIResources::ThemeEntryType type, const QStr
 
 QImage UIResources::tintedImage(const QImage &image, const QColor &color)
 {
+#ifndef GAMMARAY_QT6_TODO
     QImage img(image.alphaChannel());
     img.setDevicePixelRatio(image.devicePixelRatio());
     QColor newColor = color;
@@ -195,6 +196,9 @@ QImage UIResources::tintedImage(const QImage &image, const QColor &color)
         img.setColor(i, newColor.rgba());
     }
     return img;
+#else
+    return {};
+#endif
 }
 
 QPixmap UIResources::tintedPixmap(const QImage &image, const QColor &color)

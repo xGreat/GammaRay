@@ -79,8 +79,10 @@ Q_DECL_EXPORT void gammaray_save_widget_to_pdf(QWidget *widget, const QString &f
     QPrinter printer(QPrinter::ScreenResolution);
     printer.setOutputFileName(fileName);
     printer.setOutputFormat(QPrinter::PdfFormat);
+#ifndef GAMMARAY_QT6_TODO
     printer.setPageMargins(0, 0, 0, 0, QPrinter::DevicePixel);
     printer.setPaperSize(widget->size(), QPrinter::DevicePixel);
+#endif
 
     widget->render(&printer);
 }

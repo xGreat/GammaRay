@@ -50,14 +50,18 @@
 #include <QValidator>
 
 #include <QGuiApplication>
+#ifndef GAMMARAY_QT6_TODO
 #include <QOpenGLShader>
+#endif
 #include <QSurfaceFormat>
 #endif
 
 Q_DECLARE_METATYPE(Qt::ConnectionType)
 Q_DECLARE_METATYPE(QMetaMethod::Access)
 Q_DECLARE_METATYPE(QMetaMethod::MethodType)
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
 Q_DECLARE_METATYPE(const QMetaObject *)
+#endif
 
 #include <QTimeZone>
 Q_DECLARE_METATYPE(QTimeZone)
@@ -82,7 +86,9 @@ Q_DECLARE_METATYPE(QPainter::RenderHints)
 Q_DECLARE_METATYPE(QPaintEngine::PolygonDrawMode)
 
 #ifndef QT_NO_OPENGL
+#ifndef GAMMARAY_QT6_TODO
 Q_DECLARE_METATYPE(QOpenGLShader::ShaderType)
+#endif
 #endif
 Q_DECLARE_METATYPE(QSurfaceFormat)
 #endif

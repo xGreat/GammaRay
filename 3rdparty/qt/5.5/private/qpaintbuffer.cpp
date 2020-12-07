@@ -677,8 +677,10 @@ void QPaintBufferEngine::penChanged()
         } else {
             qreal penWidth = (pen.widthF() == 0) ? 1 : pen.widthF();
             QPointF transformedWidth(penWidth, penWidth);
+#ifndef GAMMARAY_QT6_TODO
             if (!qt_pen_is_cosmetic(pen, state()->renderHints))
                 transformedWidth = painter()->transform().map(transformedWidth);
+#endif
             buffer->penWidthAdjustment = transformedWidth.x() / 2.0;
         }
     }
@@ -1461,6 +1463,7 @@ void QPainterReplayer::process(const QPaintBufferCommand &cmd)
         QPainter::RenderHints xored = ph ^ nh;
         if (xored & QPainter::Antialiasing)
             painter->setRenderHint(QPainter::Antialiasing, nh & QPainter::Antialiasing);
+#ifndef GAMMARAY_QT6_TODO
         if (xored & QPainter::HighQualityAntialiasing)
             painter->setRenderHint(QPainter::HighQualityAntialiasing, nh & QPainter::HighQualityAntialiasing);
         if (xored & QPainter::TextAntialiasing)
@@ -1471,6 +1474,7 @@ void QPainterReplayer::process(const QPaintBufferCommand &cmd)
             painter->setRenderHint(QPainter::NonCosmeticDefaultPen, nh & QPainter::NonCosmeticDefaultPen);
         if (xored & QPainter::Qt4CompatiblePainting)
             painter->setRenderHint(QPainter::Qt4CompatiblePainting, nh & QPainter::Qt4CompatiblePainting);
+#endif
         break; }
 
     case QPaintBufferPrivate::Cmd_SetOpacity: {

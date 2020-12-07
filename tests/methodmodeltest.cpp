@@ -49,7 +49,9 @@ class MethodModelTest : public BaseProbeTest
     Q_OBJECT
 public slots:
     MY_TAG void taggedSlot() {}
+#ifndef GAMMARAY_QT6_TODO
     Q_REVISION(1407) void revisionedSlot() {}
+#endif
 
 private slots:
     void modelTest()

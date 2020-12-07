@@ -1,4 +1,4 @@
-find_package(KF5CoreAddons NO_MODULE QUIET)
+#find_package(KF5CoreAddons NO_MODULE QUIET)
 set_package_properties(KF5CoreAddons PROPERTIES
   TYPE OPTIONAL
   DESCRIPTION "KDE KCoreAddons Framework"

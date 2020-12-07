@@ -22,7 +22,9 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 # THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-find_package(Qt5Core QUIET)
+if (NOT Qt6Core_FOUND)
+  find_package(Qt5Core QUIET)
+endif()
 
 if (Qt5Core_FOUND)
     set(_qmake_executable_default "qmake-qt5")
