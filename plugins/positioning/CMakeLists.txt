@@ -42,7 +42,7 @@ if(GAMMARAY_BUILD_UI AND Qt5Location_FOUND AND Qt5QuickWidgets_FOUND AND NOT Qt5
 
   target_link_libraries(gammaray_positioning_ui
     gammaray_ui
-    Qt5::Widgets
+    Qt::Widgets
     Qt5::Positioning
     Qt5::Location
     Qt5::QuickWidgets

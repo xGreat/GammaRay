@@ -16,7 +16,7 @@ gammaray_add_plugin(gammaray_eventmonitor_plugin
 
 target_include_directories(gammaray_eventmonitor_plugin SYSTEM PRIVATE ${Qt5Core_PRIVATE_INCLUDE_DIRS})
 target_link_libraries(gammaray_eventmonitor_plugin
-  Qt5::Gui
+  Qt::Gui
   gammaray_core
 )
 endif()

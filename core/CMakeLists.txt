@@ -134,7 +134,7 @@ set_target_properties(gammaray_core PROPERTIES
 )
 gammaray_set_rpath(gammaray_core ${LIB_INSTALL_DIR})
 
-target_link_libraries(gammaray_core LINK_PUBLIC Qt5::Core LINK_PRIVATE Qt5::Gui)
+target_link_libraries(gammaray_core LINK_PUBLIC Qt::Core LINK_PRIVATE Qt::Gui)
 if (TARGET Qt5::AndroidExtras)
     target_link_libraries(gammaray_core LINK_PRIVATE Qt5::AndroidExtras)
 endif()

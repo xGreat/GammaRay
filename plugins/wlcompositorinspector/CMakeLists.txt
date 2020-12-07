@@ -37,7 +37,7 @@ if(GAMMARAY_BUILD_UI AND (NOT MSVC OR NOT MSVC_VERSION LESS 1800)) # at least MS
 
 
   target_link_libraries(gammaray_wlcompositorinspector_ui
-    Qt5::Widgets
+    Qt::Widgets
     gammaray_common
     gammaray_ui
   )

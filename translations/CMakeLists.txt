@@ -2,7 +2,7 @@ set(LANGUAGES en de)
 
 # translation tools
 add_executable(ljsonupdate ljsonupdate.cpp)
-target_link_libraries(ljsonupdate Qt5::Core)
+target_link_libraries(ljsonupdate Qt::Core)
 
 # ts file update (manual target, affects source dir)
 file(GLOB_RECURSE jsons "${CMAKE_SOURCE_DIR}/plugins/*.json")
