@@ -91,9 +91,11 @@ void ConnectPage::validateHostAddress(const QString &address)
     handleLocalAddress(stillToParse, correctSoFar);
     handleIPAddress(stillToParse, correctSoFar);
 
+#ifndef GAMMARAY_QT6_TODO
     QRegExp hostNameFormat("^([a-zA-Z][a-zA-Z0-9\\-\\.]+[a-zA-Z0-9](:[0-9]{1,5})?)$");
     if (hostNameFormat.exactMatch(stillToParse))
         handleHostName(stillToParse);
+#endif
 
     // if we came down here and there's nothing more to parse, we are good
     // set text back to black again
@@ -145,11 +147,14 @@ void ConnectPage::handleIPAddress(QString &stillToParse, bool &correctSoFar)
         possibleIPv6Address = QHostAddress(stillToParse);
 
     QHostAddress possibleIPv6BracketAddress;
+#ifndef GAMMARAY_QT6_TODO
     QRegExp bracketFormat(R"(^\[([0-9a-f\:\.]*)\].*$)");
     if (bracketFormat.exactMatch(stillToParse))
         possibleIPv6BracketAddress = QHostAddress(bracketFormat.cap(1));
+#endif
 
     QHostAddress possibleIPv6InterfaceAddress;
+#ifndef GAMMARAY_QT6_TODO
     QRegExp interfaceFormat(R"(^([^\%]*)(\%[^\:]+)(:[0-9]+)?$)");
     if (interfaceFormat.exactMatch(stillToParse))
         possibleIPv6InterfaceAddress = QHostAddress(interfaceFormat.cap(1));
@@ -172,6 +177,7 @@ void ConnectPage::handleIPAddress(QString &stillToParse, bool &correctSoFar)
         stillToParse.replace(interfaceFormat.cap(2), QString());
         handleAddressAndPort(stillToParse, correctSoFar, possibleIPv6InterfaceAddress.toString());
     }
+#endif
 }
 
 void ConnectPage::handleHostName(QString &stillToParse)
@@ -233,6 +239,7 @@ void ConnectPage::handleAddressAndPort(QString &stillToParse, bool &correctSoFar
 
 void ConnectPage::handlePortString(QString &stillToParse, bool &correctSoFar)
 {
+#ifndef GAMMARAY_QT6_TODO
     QRegExp r("\\:[0-9]{1,5}");
     if (r.exactMatch(stillToParse)) {
         auto portString = r.cap(0);
@@ -243,6 +250,7 @@ void ConnectPage::handlePortString(QString &stillToParse, bool &correctSoFar)
             correctSoFar = true;
         }
     }
+#endif
 }
 
 void ConnectPage::showStandardPortAssumedWarning()
