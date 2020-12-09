@@ -51,28 +51,26 @@ QT_END_NAMESPACE
 
 void StreamOperators::registerOperators()
 {
-    qRegisterMetaTypeStreamOperators<QMetaMethod::Access>();
-    qRegisterMetaTypeStreamOperators<QMetaMethod::MethodType>();
-    qRegisterMetaTypeStreamOperators<Qt::ConnectionType>();
-    qRegisterMetaTypeStreamOperators<Qt::CaseSensitivity>();
-    qRegisterMetaTypeStreamOperators<QHash<int, QByteArray> >();
+    StreamOperators::registerOperators<QMetaMethod::Access>();
+    StreamOperators::registerOperators<QMetaMethod::MethodType>();
+    StreamOperators::registerOperators<Qt::ConnectionType>();
+    StreamOperators::registerOperators<Qt::CaseSensitivity>();
+    StreamOperators::registerOperators<QHash<int, QByteArray> >();
 
-    qRegisterMetaType<ObjectId>();
-    qRegisterMetaTypeStreamOperators<ObjectId>();
+    StreamOperators::registerOperators<ObjectId>();
     // This is needed so QVariant based comparison works (ie: QAIM::match)
     QMetaType::registerComparators<ObjectId>();
 
-    qRegisterMetaType<ObjectIds>();
-    qRegisterMetaTypeStreamOperators<ObjectIds>();
+    StreamOperators::registerOperators<ObjectIds>();
     // This is needed so QVariant based comparison works (ie: QAIM::match)
     QMetaType::registerComparators<ObjectIds>();
 
-    qRegisterMetaTypeStreamOperators<GammaRay::VariantWrapper>();
-    qRegisterMetaTypeStreamOperators<GammaRay::SourceLocation>();
-    qRegisterMetaTypeStreamOperators<QVector<SourceLocation>>();
-    qRegisterMetaTypeStreamOperators<GammaRay::QMetaObjectValidatorResult::Results>();
-    qRegisterMetaTypeStreamOperators<GammaRay::PropertyModel::PropertyFlags>();
+    StreamOperators::registerOperators<GammaRay::VariantWrapper>();
+    StreamOperators::registerOperators<GammaRay::SourceLocation>();
+    StreamOperators::registerOperators<QVector<SourceLocation>>();
+    StreamOperators::registerOperators<GammaRay::QMetaObjectValidatorResult::Results>();
+    StreamOperators::registerOperators<GammaRay::PropertyModel::PropertyFlags>();
 
-    qRegisterMetaTypeStreamOperators<EnumDefinition>();
-    qRegisterMetaTypeStreamOperators<EnumValue>();
+    StreamOperators::registerOperators<EnumDefinition>();
+    StreamOperators::registerOperators<EnumValue>();
 }
