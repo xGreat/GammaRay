@@ -178,8 +178,10 @@ void SGWireframeWidget::paintEvent(QPaintEvent *)
                           : m_drawingMode
                           == GL_TRIANGLE_FAN ? QStringLiteral("GL_TRIANGLE_FAN") : tr("Unknown");
     QString text = tr("Drawing mode: %1").arg(drawingMode);
+#ifndef GAMMARAY_QT6_TODO
     painter.drawText(contentsRect().width() - painter.fontMetrics().width(text),
                      contentsRect().height() - painter.fontMetrics().height(), text);
+#endif
 }
 
 void SGWireframeWidget::drawWire(QPainter *painter, int vertexIndex1, int vertexIndex2)

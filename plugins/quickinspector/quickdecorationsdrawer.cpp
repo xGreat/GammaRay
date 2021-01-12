@@ -306,6 +306,7 @@ void QuickDecorationsDrawer::drawTraces()
         m_painter->setPen(QColor(60, 60, 60, 70));
         m_painter->setBrush(m_painter->pen().color());
 
+#ifndef GAMMARAY_QT6_TODO
         const int margin = m_painter->fontMetrics().width(QLatin1Char('X')) / 2;
         const QRectF classRect =
             itemGeometry.boundingRect.adjusted(
@@ -334,6 +335,7 @@ void QuickDecorationsDrawer::drawTraces()
         m_painter->drawText(itemGeometry.boundingRect.adjusted(margin, margin, -margin, -margin),
                           Qt::AlignVCenter | Qt::AlignLeft | Qt::TextDontClip,
                           itemGeometry.traceName);
+#endif
     }
 
     m_painter->restore();

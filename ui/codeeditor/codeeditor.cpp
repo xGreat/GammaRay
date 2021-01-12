@@ -97,7 +97,11 @@ int CodeEditor::sidebarWidth() const
         ++digits;
         count /= 10;
     }
+#ifndef GAMMARAY_QT6_TODO
     return 4 + fontMetrics().width(QLatin1Char('9')) * digits + foldingBarWidth();
+#else
+    return 42;
+#endif
 }
 
 int CodeEditor::foldingBarWidth() const
