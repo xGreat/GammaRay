@@ -168,6 +168,7 @@ void RemoteViewServer::sendMouseEvent(int type, const QPoint &localPos, int butt
 void RemoteViewServer::sendWheelEvent(const QPoint &localPos, QPoint pixelDelta, QPoint angleDelta,
                                       int buttons, int modifiers)
 {
+#ifndef GAMMARAY_QT6_TODO
     if (!m_eventReceiver)
         return;
 
@@ -176,6 +177,7 @@ void RemoteViewServer::sendWheelEvent(const QPoint &localPos, QPoint pixelDelta,
                                  /*not used*/ (Qt::MouseButtons)buttons,
                                  (Qt::KeyboardModifiers)modifiers);
     QCoreApplication::postEvent(m_eventReceiver, event);
+#endif
 }
 
 void RemoteViewServer::sendTouchEvent(int type, int touchDeviceType, int deviceCaps, int touchDeviceMaxTouchPoints,

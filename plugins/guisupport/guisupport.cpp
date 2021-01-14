@@ -489,10 +489,12 @@ void GuiSupport::registerMetaTypes()
     MO_ADD_METAOBJECT1(QWheelEvent, QInputEvent);
     MO_ADD_PROPERTY_RO(QWheelEvent, pixelDelta);
     MO_ADD_PROPERTY_RO(QWheelEvent, angleDelta);
+#ifndef GAMMARAY_QT6_TODO
     MO_ADD_PROPERTY_RO(QWheelEvent, delta);
     MO_ADD_PROPERTY_RO(QWheelEvent, orientation);
     MO_ADD_PROPERTY_RO(QWheelEvent, posF);
     MO_ADD_PROPERTY_RO(QWheelEvent, globalPosF);
+#endif
     MO_ADD_PROPERTY_RO(QWheelEvent, buttons);
     MO_ADD_PROPERTY_RO(QWheelEvent, phase);
 #if QT_VERSION >= QT_VERSION_CHECK(5, 7, 0)
