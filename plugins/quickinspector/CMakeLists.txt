@@ -44,10 +44,10 @@ if(TARGET Qt::Quick)
       target_sources(gammaray_quickinspector PUBLIC ${CMAKE_CURRENT_LIST_DIR}/quickimplicitbindingdependencyprovider.cpp)
     endif()
 
-    target_include_directories(gammaray_quickinspector SYSTEM PRIVATE ${Qt5Quick_PRIVATE_INCLUDE_DIRS})
     target_link_libraries(gammaray_quickinspector
       gammaray_quickinspector_shared
       gammaray_core Qt::Quick
+      Qt::QuickPrivate
       gammaray_kitemmodels
     )
   endif()

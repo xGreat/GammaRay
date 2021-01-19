@@ -30,7 +30,6 @@ target_link_libraries(gammaray_statemachineviewer_plugin
 
 if(TARGET Qt::Scxml)
   target_link_libraries(gammaray_statemachineviewer_plugin Qt::Scxml Qt::ScxmlPrivate)
-  target_include_directories(gammaray_statemachineviewer_plugin SYSTEM PRIVATE ${Qt5Scxml_PRIVATE_INCLUDE_DIRS})
 endif()
 endif()
 

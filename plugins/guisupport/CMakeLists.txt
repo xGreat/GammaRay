@@ -7,8 +7,7 @@ set(gammaray_guisupport_srcs
 )
 gammaray_add_plugin(gammaray_guisupport JSON gammaray_guisupport.json SOURCES ${gammaray_guisupport_srcs})
 target_link_libraries(gammaray_guisupport gammaray_core)
-target_include_directories(gammaray_guisupport SYSTEM PRIVATE ${Qt5Gui_PRIVATE_INCLUDE_DIRS})
-target_link_libraries(gammaray_guisupport Qt::Gui)
+target_link_libraries(gammaray_guisupport Qt::Gui Qt::GuiPrivate)
 endif()
 
 # ui plugin
